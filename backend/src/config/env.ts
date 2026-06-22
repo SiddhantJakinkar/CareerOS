@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { loadGeminiApiKeys } from './geminiKeys.js';
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -8,7 +9,8 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32),
   JWT_ACCESS_EXPIRY: z.string().default('15m'),
   JWT_REFRESH_EXPIRY: z.string().default('7d'),
-  GEMINI_API_KEY: z.string().min(1),
+  GEMINI_API_KEY: z.string().optional(),
+  GEMINI_API_KEYS: z.string().optional(),
   GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
   WHISPER_API_KEY: z.string().optional(),
   CLOUDINARY_CLOUD_NAME: z.string().min(1),
@@ -29,13 +31,20 @@ export type Env = z.infer<typeof envSchema>;
 function loadEnv(): Env {
   const parsed = envSchema.safeParse(process.env);
   if (!parsed.success) {
-    const missing = parsed.error.issues.map((i) => i.path.join('.')).join(', ');
-    console.error(`Environment validation failed: ${missing}`);
-    if (process.env.NODE_ENV === 'production') {
-      process.exit(1);
-    }
+    const missing = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('\n  ');
+    console.error(`Environment validation failed:\n  ${missing}`);
+    process.exit(1);
   }
-  return parsed.success ? parsed.data : (process.env as unknown as Env);
+
+  const geminiKeys = loadGeminiApiKeys();
+  if (geminiKeys.length === 0) {
+    console.error(
+      'Environment validation failed:\n  At least one Gemini API key is required (GEMINI_API_KEY or GEMINI_API_KEYS)'
+    );
+    process.exit(1);
+  }
+
+  return parsed.data;
 }
 
 export const env = loadEnv();

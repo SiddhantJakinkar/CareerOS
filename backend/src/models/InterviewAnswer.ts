@@ -8,6 +8,9 @@ export interface IInterviewAnswer extends Document {
   answer: string;
   transcript?: string;
   audioUrl?: string;
+  videoUrl?: string;
+  videoPublicId?: string;
+  durationSeconds?: number;
   evaluation: {
     score: number;
     feedback: string;
@@ -26,6 +29,9 @@ const interviewAnswerSchema = new Schema<IInterviewAnswer>(
     answer: { type: String, required: true },
     transcript: String,
     audioUrl: String,
+    videoUrl: String,
+    videoPublicId: String,
+    durationSeconds: Number,
     evaluation: {
       score: { type: Number, default: 0 },
       feedback: { type: String, default: '' },

@@ -16,7 +16,7 @@ type InterviewMode = 'text' | 'voice' | 'video';
 const MODES: Array<{ id: InterviewMode; label: string; icon: React.ElementType; description: string }> = [
   { id: 'text', label: 'Text', icon: MessageSquare, description: 'Type answers to AI questions' },
   { id: 'voice', label: 'Voice', icon: Mic, description: 'Speak your answers with live feedback' },
-  { id: 'video', label: 'Video', icon: Video, description: 'Live camera interview or upload recording' },
+  { id: 'video', label: 'Video', icon: Video, description: 'Live AI mock interview with camera — like Internshala screening' },
 ];
 
 export default function AIInterviewPage() {
@@ -75,7 +75,9 @@ export default function AIInterviewPage() {
 
       {mode === 'text' && <TextInterviewMode {...domainData} />}
       {mode === 'voice' && <VoiceInterviewMode {...domainData} />}
-      {mode === 'video' && <VideoInterviewMode {...domainData} />}
+      {mode === 'video' && (
+        <VideoInterviewMode {...domainData} jobId={searchParams.get('jobId') ?? undefined} />
+      )}
     </div>
   );
 }

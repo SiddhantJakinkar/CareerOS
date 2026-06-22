@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import { MapPin, ExternalLink, FileText, Mail, Bookmark, Send } from 'lucide-react';
+import { MapPin, ExternalLink, FileText, Mail, Bookmark, Send, Video } from 'lucide-react';
 import { jobApi, applicationApi, resumeApi } from '@/services/endpoints';
 import { getErrorMessage } from '@/services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +16,7 @@ import { CircularProgress } from '@/components/ui/motion';
 
 export default function JobDetailsPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [generating, setGenerating] = useState(false);
 
   const { data, isLoading, error, refetch } = useQuery({
@@ -85,6 +86,13 @@ export default function JobDetailsPage() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => navigate(`/ai-interview?mode=video&jobId=${job._id}`)}
+          >
+            <Video className="mr-2 h-4 w-4" />
+            Practice Interview
+          </Button>
           <Button variant="secondary" onClick={() => saveMutation.mutate()}><Bookmark className="mr-2 h-4 w-4" />Save</Button>
           <Button variant="secondary" onClick={handleGenerateResume} loading={generating}><FileText className="mr-2 h-4 w-4" />Resume</Button>
           <Button variant="secondary" onClick={handleCoverLetter}><Mail className="mr-2 h-4 w-4" />Cover Letter</Button>
@@ -131,6 +139,23 @@ export default function JobDetailsPage() {
                   </div>
                 </div>
               ) : null}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>Prepare for This Role</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-text-muted">
+                Take a live AI mock interview tailored to this job — questions based on the role,
+                company, and required skills.
+              </p>
+              <Button
+                className="w-full"
+                onClick={() => navigate(`/ai-interview?mode=video&jobId=${job._id}`)}
+              >
+                <Video className="mr-2 h-4 w-4" />
+                Start Job-Specific Practice
+              </Button>
             </CardContent>
           </Card>
 

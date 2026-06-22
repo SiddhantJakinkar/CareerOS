@@ -142,6 +142,8 @@ export interface Interview {
   metrics: Record<string, number>;
   feedback: string;
   suggestions: string[];
+  strengths?: string[];
+  focusAreas?: string[];
   createdAt: string;
 }
 

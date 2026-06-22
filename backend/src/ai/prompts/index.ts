@@ -142,13 +142,20 @@ export async function evaluateInterviewAnswer(
   userId: string,
   question: string,
   answer: string,
-  domain: string
+  domain: string,
+  jobContext?: LiveInterviewJobContext
 ): Promise<InterviewEvaluation> {
+  const jobBlock = formatLiveInterviewContext(jobContext);
   return geminiService.generateJSON<InterviewEvaluation>(
     userId,
     'interview_evaluation',
-    INTERVIEW_EVAL_PROMPT,
-    `Domain: ${domain}\nQuestion: ${question}\nAnswer: ${answer}`
+    INTERVIEW_EVAL_PROMPT +
+      (jobBlock
+        ? '\nEvaluate against the specific job requirements when job context is provided.'
+        : ''),
+    `Domain: ${domain}
+${jobBlock ? `${jobBlock}\n` : ''}Question: ${question}
+Answer: ${answer}`
   );
 }
 
@@ -164,6 +171,194 @@ export async function generateInterviewQuestions(
     `Domain: ${domain}, Count: ${count}`
   );
   return result.questions;
+}
+
+export interface LiveInterviewJobContext {
+  jobTitle?: string;
+  companyName?: string;
+  targetRole?: string;
+  jobDescription?: string;
+  jobSkills?: string[];
+  experience?: string;
+}
+
+function formatLiveInterviewContext(context?: LiveInterviewJobContext): string {
+  if (!context) return '';
+  const lines: string[] = [];
+  if (context.jobTitle) lines.push(`Role: ${context.jobTitle}`);
+  if (context.companyName) lines.push(`Company: ${context.companyName}`);
+  if (context.targetRole) lines.push(`Candidate target: ${context.targetRole}`);
+  if (context.experience) lines.push(`Experience required: ${context.experience}`);
+  if (context.jobSkills?.length) lines.push(`Key skills: ${context.jobSkills.join(', ')}`);
+  if (context.jobDescription) {
+    lines.push(`Job description (excerpt):\n${context.jobDescription.slice(0, 2500)}`);
+  }
+  return lines.join('\n');
+}
+
+const LIVE_QUESTION_PROMPT = `You are an expert technical/HR interviewer conducting a LIVE mock interview.
+Generate ONE natural interview question as the interviewer would ask in real time.
+Rules:
+- Sound conversational, not robotic
+- For follow-ups: probe deeper based on the candidate's previous answer OR pivot if they skipped
+- Mix behavioral and domain-specific questions appropriately
+- Do NOT repeat questions already asked
+- When a specific job opening is provided, tailor questions to that role, company, job description, and required skills
+- Include realistic questions this company would ask for this position
+- Return JSON: { "question": "string" }`;
+
+export async function generateLiveInterviewQuestion(
+  userId: string,
+  domain: string,
+  history: Array<{ question: string; answer: string; skipped?: boolean }>,
+  context?: LiveInterviewJobContext
+): Promise<string> {
+  const historyText =
+    history.length === 0
+      ? 'This is the opening question. Start with a warm but professional opener.'
+      : history
+          .map(
+            (h, i) =>
+              `Q${i + 1}: ${h.question}\nA${i + 1}: ${h.skipped ? '(candidate did not answer / skipped)' : h.answer}`
+          )
+          .join('\n\n');
+
+  const result = await geminiService.generateJSON<{ question: string }>(
+    userId,
+    'interview_evaluation',
+    LIVE_QUESTION_PROMPT,
+    `Domain: ${domain}
+${formatLiveInterviewContext(context)}
+
+Previous conversation:
+${historyText}`
+  );
+  return result.question;
+}
+
+const SKIPPED_EVAL: InterviewEvaluation = {
+  score: 0,
+  feedback: 'No answer was provided for this question.',
+  strengths: [],
+  improvements: ['Try to attempt every question even if unsure — partial answers are better than silence.'],
+  technicalKnowledge: 0,
+  communication: 0,
+  confidence: 0,
+  problemSolving: 0,
+  clarity: 0,
+};
+
+export function getSkippedEvaluation(): InterviewEvaluation {
+  return { ...SKIPPED_EVAL };
+}
+
+export interface InterviewOverallReview {
+  overallReview: string;
+  strengths: string[];
+  focusAreas: string[];
+  suggestions: string[];
+}
+
+const LIVE_OVERALL_REVIEW_PROMPT = `You are an expert interview coach writing a post-interview debrief for a candidate.
+Review the full mock interview session and give honest, constructive feedback.
+When a specific job was the interview target, assess readiness for THAT role and reference gaps vs the job requirements.
+Return JSON with:
+- overallReview: string (2-4 paragraphs summarizing performance, tone, and readiness)
+- strengths: string[] (3-5 specific things the candidate did well; empty if they skipped most questions)
+- focusAreas: string[] (3-5 skill/behavior areas to prioritize — e.g. "System design fundamentals", "Structuring behavioral answers")
+- suggestions: string[] (4-6 actionable improvement steps they can practice before the next interview)`;
+
+export async function generateLiveInterviewOverallReview(
+  userId: string,
+  domain: string,
+  metrics: {
+    technicalKnowledge: number;
+    communication: number;
+    confidence: number;
+    problemSolving: number;
+    clarity: number;
+  },
+  answers: Array<{
+    question: string;
+    answer: string;
+    score: number;
+    feedback: string;
+    skipped: boolean;
+  }>,
+  context?: LiveInterviewJobContext
+): Promise<InterviewOverallReview> {
+  const conversation = answers
+    .map(
+      (a, i) =>
+        `Q${i + 1}: ${a.question}\nA${i + 1}: ${a.skipped ? '(no answer / skipped)' : a.answer}\nScore: ${a.score}%\nPer-answer feedback: ${a.feedback}`
+    )
+    .join('\n\n');
+
+  return geminiService.generateJSON<InterviewOverallReview>(
+    userId,
+    'interview_evaluation',
+    LIVE_OVERALL_REVIEW_PROMPT,
+    `Domain: ${domain}
+${formatLiveInterviewContext(context)}
+
+Aggregate metrics (0-100):
+- Technical knowledge: ${metrics.technicalKnowledge}
+- Communication: ${metrics.communication}
+- Confidence: ${metrics.confidence}
+- Problem solving: ${metrics.problemSolving}
+- Clarity: ${metrics.clarity}
+
+Full session:
+${conversation}`
+  );
+}
+
+function getNoAnswerOverallReview(): InterviewOverallReview {
+  return {
+    overallReview:
+      'You completed the interview session but did not provide substantive answers to most questions. In a real interview, silence or skipping questions significantly hurts your chances. The good news is that mock interviews are the safest place to build this habit — start practicing speaking even when you are unsure.',
+    strengths: [],
+    focusAreas: [
+      'Verbal communication under pressure',
+      'Interview confidence and presence',
+      'Domain fundamentals for your target role',
+      'Answer structuring (situation → action → result)',
+    ],
+    suggestions: [
+      'Practice answering common questions out loud for 10 minutes daily',
+      'Use the STAR method for behavioral questions even when nervous',
+      'Prepare 3-4 talking points per project or experience on your resume',
+      'Record yourself answering one question and listen back for clarity',
+      'Attempt every question — partial answers are better than silence',
+    ],
+  };
+}
+
+export function getFallbackOverallReview(
+  metrics: {
+    technicalKnowledge: number;
+    communication: number;
+    confidence: number;
+    problemSolving: number;
+    clarity: number;
+  },
+  answeredCount: number
+): InterviewOverallReview {
+  if (answeredCount === 0) return getNoAnswerOverallReview();
+
+  const weakest = Object.entries(metrics).sort(([, a], [, b]) => a - b)[0]?.[0] ?? 'communication';
+  const label = weakest.replace(/([A-Z])/g, ' $1').trim();
+
+  return {
+    overallReview: `You completed the interview with an overall score based on your answers across ${answeredCount} question(s). Review each question below for specific feedback. Keep practicing to improve consistency across all areas.`,
+    strengths: ['Showed willingness to complete the full interview session'],
+    focusAreas: [label.charAt(0).toUpperCase() + label.slice(1)],
+    suggestions: [
+      'Review per-question feedback and rewrite stronger sample answers',
+      'Practice the questions you scored lowest on',
+      'Time-box answers to 60-90 seconds with a clear opening and conclusion',
+    ],
+  };
 }
 
 export interface SkillGapResult {

@@ -15,6 +15,7 @@ const JobSearchPage = lazy(() => import('@/pages/jobs/JobSearchPage'));
 const JobDetailsPage = lazy(() => import('@/pages/jobs/JobDetailsPage'));
 const ResumeAnalyzerPage = lazy(() => import('@/pages/resume/ResumeAnalyzerPage'));
 const AIInterviewPage = lazy(() => import('@/pages/interview/AIInterviewPage'));
+const JoinInterviewPage = lazy(() => import('@/pages/interview/JoinInterviewPage'));
 const CodingAssessmentPage = lazy(() => import('@/pages/coding/CodingAssessmentPage'));
 const SkillGapPage = lazy(() => import('@/pages/skills/SkillGapPage'));
 const RoadmapPage = lazy(() => import('@/pages/skills/RoadmapPage'));
@@ -69,6 +70,7 @@ export default function App() {
               <Route path="/jobs/:id" element={<LazyPage><JobDetailsPage /></LazyPage>} />
               <Route path="/resume-analyzer" element={<LazyPage><ResumeAnalyzerPage /></LazyPage>} />
               <Route path="/ai-interview" element={<LazyPage><AIInterviewPage /></LazyPage>} />
+              <Route path="/interview/join/:token" element={<LazyPage><JoinInterviewPage /></LazyPage>} />
               <Route path="/voice-interview" element={<Navigate to="/ai-interview?mode=voice" replace />} />
               <Route path="/video-interview" element={<Navigate to="/ai-interview?mode=video" replace />} />
               <Route path="/coding" element={<LazyPage><CodingAssessmentPage /></LazyPage>} />

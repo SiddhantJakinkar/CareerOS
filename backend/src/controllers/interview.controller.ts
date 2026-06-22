@@ -10,7 +10,6 @@ import {
 import { AppError } from '../middleware/errorHandler.js';
 import {
   logActivity,
-  createNotification,
   updatePlacementReadiness,
 } from '../services/recommendation.service.js';
 import { Profile } from '../models/Profile.js';
@@ -20,6 +19,10 @@ import {
   getInterviewDomainsPayload,
   type InterviewDomainId,
 } from '../constants/interviewDomains.js';
+import { VIDEO_INTERVIEW_CONFIG } from '../constants/videoInterview.js';
+import { uploadVideoToCloudinary } from '../config/cloudinary.js';
+import { transcribeAudio } from '../ai/whisper.service.js';
+import { finalizeInterview } from './interview.controller.helpers.js';
 
 export const startInterviewSchema = z.object({
   domain: z.enum(INTERVIEW_DOMAIN_IDS),
@@ -31,7 +34,59 @@ export const answerSchema = z.object({
   answer: z.string().min(1),
 });
 
+export const videoAnswerSchema = z.object({
+  interviewId: z.string().min(1),
+  durationSeconds: z.coerce.number().optional(),
+});
+
 const DOMAIN_LABELS_MAP = DOMAIN_LABELS;
+
+function averageMetric(current: number, next: number): number {
+  return Math.round((current + next) / 2) || next;
+}
+
+async function applyAnswerEvaluation(
+  interview: InstanceType<typeof Interview>,
+  evaluation: Awaited<ReturnType<typeof evaluateInterviewAnswer>>
+): Promise<boolean> {
+  interview.metrics.technicalKnowledge = averageMetric(
+    interview.metrics.technicalKnowledge,
+    evaluation.technicalKnowledge
+  );
+  interview.metrics.communication = averageMetric(
+    interview.metrics.communication,
+    evaluation.communication
+  );
+  interview.metrics.confidence = averageMetric(
+    interview.metrics.confidence,
+    evaluation.confidence
+  );
+  interview.metrics.problemSolving = averageMetric(
+    interview.metrics.problemSolving,
+    evaluation.problemSolving
+  );
+  interview.metrics.clarity = averageMetric(interview.metrics.clarity, evaluation.clarity);
+
+  interview.currentQuestionIndex += 1;
+  const isComplete = interview.currentQuestionIndex >= interview.questions.length;
+
+  if (isComplete) {
+    interview.status = 'completed';
+    interview.completedAt = new Date();
+    interview.overallScore = Math.round(
+      (interview.metrics.technicalKnowledge +
+        interview.metrics.communication +
+        interview.metrics.confidence +
+        interview.metrics.problemSolving +
+        interview.metrics.clarity) /
+        5
+    );
+    interview.feedback = evaluation.feedback;
+    interview.suggestions = evaluation.improvements;
+  }
+
+  return isComplete;
+}
 
 export async function getInterviewDomains(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -64,6 +119,7 @@ export async function startInterview(req: Request, res: Response, next: NextFunc
       data: {
         interview,
         currentQuestion: questions[0],
+        ...(type === 'video' ? { config: VIDEO_INTERVIEW_CONFIG } : {}),
       },
     });
   } catch (error) {
@@ -102,56 +158,10 @@ export async function submitAnswer(req: Request, res: Response, next: NextFuncti
       },
     });
 
-    interview.metrics.technicalKnowledge = Math.round(
-      (interview.metrics.technicalKnowledge + evaluation.technicalKnowledge) / 2 || evaluation.technicalKnowledge
-    );
-    interview.metrics.communication = Math.round(
-      (interview.metrics.communication + evaluation.communication) / 2 || evaluation.communication
-    );
-    interview.metrics.confidence = Math.round(
-      (interview.metrics.confidence + evaluation.confidence) / 2 || evaluation.confidence
-    );
-    interview.metrics.problemSolving = Math.round(
-      (interview.metrics.problemSolving + evaluation.problemSolving) / 2 || evaluation.problemSolving
-    );
-    interview.metrics.clarity = Math.round(
-      (interview.metrics.clarity + evaluation.clarity) / 2 || evaluation.clarity
-    );
-
-    interview.currentQuestionIndex += 1;
-
-    const isComplete = interview.currentQuestionIndex >= interview.questions.length;
+    const isComplete = await applyAnswerEvaluation(interview, evaluation);
 
     if (isComplete) {
-      interview.status = 'completed';
-      interview.completedAt = new Date();
-      interview.overallScore = Math.round(
-        (interview.metrics.technicalKnowledge +
-          interview.metrics.communication +
-          interview.metrics.confidence +
-          interview.metrics.problemSolving +
-          interview.metrics.clarity) /
-          5
-      );
-      interview.feedback = `Overall performance score: ${interview.overallScore}%`;
-      interview.suggestions = evaluation.improvements;
-
-      await Report.create({
-        userId,
-        type: 'interview',
-        title: `${DOMAIN_LABELS_MAP[interview.domain]} Interview Report`,
-        data: { metrics: interview.metrics, overallScore: interview.overallScore },
-        score: interview.overallScore,
-      });
-
-      await updatePlacementReadiness(userId);
-      await createNotification(
-        userId,
-        'Interview Complete',
-        `Your score: ${interview.overallScore}%`,
-        'interview',
-        '/ai-interview'
-      );
+      await finalizeInterview(userId, interview);
     }
 
     await interview.save();
@@ -163,6 +173,90 @@ export async function submitAnswer(req: Request, res: Response, next: NextFuncti
         interview,
         nextQuestion: isComplete ? null : interview.questions[interview.currentQuestionIndex],
         isComplete,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function submitVideoAnswer(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = req.user!.userId;
+    const { interviewId, durationSeconds } = req.body as {
+      interviewId: string;
+      durationSeconds?: number;
+    };
+
+    if (!req.file) throw new AppError('No video recording uploaded', 400);
+
+    const interview = await Interview.findOne({
+      _id: interviewId,
+      userId,
+      type: 'video',
+      status: 'in_progress',
+    });
+    if (!interview) throw new AppError('Video interview not found or already completed', 404);
+
+    const question = interview.questions[interview.currentQuestionIndex];
+    const domainLabel = DOMAIN_LABELS_MAP[interview.domain as InterviewDomainId] ?? interview.domain;
+
+    const { url, publicId, duration } = await uploadVideoToCloudinary(
+      req.file.buffer,
+      'interview-answers'
+    );
+
+    let transcript = '';
+    try {
+      transcript = await transcribeAudio(req.file.buffer, req.file.mimetype);
+    } catch {
+      transcript = '(Could not transcribe — answer recorded on video only)';
+    }
+
+    const evaluation = await evaluateInterviewAnswer(
+      userId,
+      question,
+      transcript || 'Video answer recorded without transcript.',
+      domainLabel
+    );
+
+    await InterviewAnswer.create({
+      interviewId: interview._id,
+      userId,
+      questionIndex: interview.currentQuestionIndex,
+      question,
+      answer: transcript || 'Video answer',
+      transcript,
+      videoUrl: url,
+      videoPublicId: publicId,
+      durationSeconds: durationSeconds ?? duration ?? 0,
+      evaluation: {
+        score: evaluation.score,
+        feedback: evaluation.feedback,
+        strengths: evaluation.strengths,
+        improvements: evaluation.improvements,
+      },
+    });
+
+    const isComplete = await applyAnswerEvaluation(interview, evaluation);
+
+    if (isComplete) {
+      await finalizeInterview(userId, interview);
+    }
+
+    await interview.save();
+
+    res.json({
+      success: true,
+      data: {
+        evaluation,
+        transcript,
+        videoUrl: url,
+        interview,
+        nextQuestion: isComplete ? null : interview.questions[interview.currentQuestionIndex],
+        isComplete,
+        questionNumber: interview.currentQuestionIndex,
+        totalQuestions: interview.questions.length,
       },
     });
   } catch (error) {

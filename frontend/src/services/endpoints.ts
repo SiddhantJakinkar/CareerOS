@@ -93,7 +93,56 @@ export const interviewApi = {
     api.post('/interview/start', { domain, type }),
   answer: (interviewId: string, answer: string) =>
     api.post('/interview/answer', { interviewId, answer }),
+  submitVideoAnswer: (interviewId: string, video: Blob, durationSeconds: number) => {
+    const form = new FormData();
+    form.append('video', video, `answer-${Date.now()}.webm`);
+    form.append('interviewId', interviewId);
+    form.append('durationSeconds', String(durationSeconds));
+    return api.post('/interview/video-answer', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
   getReport: (id: string) => api.get(`/interview/report/${id}`),
+  startLive: (data: {
+    domain?: string;
+    inviteToken?: string;
+    jobId?: string;
+    jobTitle?: string;
+    companyName?: string;
+  }) => api.post('/interview/live/start', data),
+  liveTurn: (
+    interviewId: string,
+    opts: {
+      transcript?: string;
+      skipped?: boolean;
+      silenceTimeout?: boolean;
+      afterRetry?: boolean;
+      durationSeconds?: number;
+      audio?: Blob;
+    }
+  ) => {
+    const form = new FormData();
+    form.append('interviewId', interviewId);
+    if (opts.transcript) form.append('transcript', opts.transcript);
+    if (opts.skipped) form.append('skipped', 'true');
+    if (opts.silenceTimeout) form.append('silenceTimeout', 'true');
+    if (opts.afterRetry) form.append('afterRetry', 'true');
+    if (opts.durationSeconds != null) form.append('durationSeconds', String(opts.durationSeconds));
+    if (opts.audio) form.append('audio', opts.audio, 'answer.webm');
+    return api.post('/interview/live/turn', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  getInvitePublic: (token: string) => api.get(`/interview/invites/public/${token}`),
+  createInvite: (data: {
+    domain: string;
+    companyName: string;
+    jobTitle: string;
+    targetRole?: string;
+    expiresInDays?: number;
+    maxQuestions?: number;
+  }) => api.post('/interview/invites', data),
+  listInvites: () => api.get('/interview/invites'),
 };
 
 export const voiceApi = {

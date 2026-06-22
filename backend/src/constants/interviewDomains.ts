@@ -105,3 +105,38 @@ export function getInterviewDomainsPayload(profile: IProfile | null) {
     defaultTargetRole: getDefaultTargetRole(profile?.academicStream),
   };
 }
+
+/** Pick the best interview domain from a job posting's title, description, and skills. */
+export function inferInterviewDomainFromJob(job: {
+  title: string;
+  description: string;
+  skills?: string[];
+}): InterviewDomainId {
+  const haystack = `${job.title} ${job.description} ${(job.skills ?? []).join(' ')}`.toLowerCase();
+
+  let best: InterviewDomainId = 'hr';
+  let bestScore = 0;
+
+  for (const domain of INTERVIEW_DOMAINS) {
+    let score = 0;
+    for (const keyword of domain.keywords) {
+      if (haystack.includes(keyword)) score += 1;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      best = domain.id;
+    }
+  }
+
+  if (bestScore > 0) return best;
+
+  if (/software|developer|engineer|programmer|full[\s-]?stack|frontend|backend|devops|sde|intern/i.test(haystack)) {
+    if (haystack.includes('python') || haystack.includes('django')) return 'python';
+    if (haystack.includes('java') || haystack.includes('spring')) return 'java';
+    if (haystack.includes('react') || haystack.includes('frontend')) return 'react';
+    if (haystack.includes('node')) return 'nodejs';
+    return 'python';
+  }
+
+  return 'hr';
+}

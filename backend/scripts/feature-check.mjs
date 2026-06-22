@@ -1,8 +1,8 @@
 import 'dotenv/config';
 
 const BASE = process.env.API_BASE || 'http://localhost:5000/api';
-const TEST_EMAIL = `featurecheck_${Date.now()}@test.com`;
-const TEST_PASSWORD = 'Test@1234';
+const TEST_EMAIL = process.env.FEATURE_CHECK_EMAIL || `featurecheck_${Date.now()}@test.com`;
+const TEST_PASSWORD = process.env.FEATURE_CHECK_PASSWORD;
 
 const results = [];
 
@@ -31,6 +31,12 @@ async function req(method, path, body, token) {
 
 async function main() {
   console.log('\n=== CareerOS Feature Check ===\n');
+
+  if (!TEST_PASSWORD) {
+    console.error('Set FEATURE_CHECK_PASSWORD in backend/.env (or env) before running feature-check.');
+    console.error('Example: FEATURE_CHECK_PASSWORD=YourTest@Pass1');
+    process.exit(1);
+  }
 
   // Health
   try {

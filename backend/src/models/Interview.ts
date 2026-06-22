@@ -3,7 +3,19 @@ import { INTERVIEW_DOMAIN_IDS } from '../constants/interviewDomains.js';
 
 export type InterviewDomain = (typeof INTERVIEW_DOMAIN_IDS)[number];
 
-export type InterviewType = 'mock' | 'voice' | 'video';
+export type InterviewType = 'mock' | 'voice' | 'video' | 'live';
+
+export interface ILiveInterviewMeta {
+  companyName?: string;
+  jobTitle?: string;
+  jobId?: Types.ObjectId;
+  jobDescription?: string;
+  jobSkills?: string[];
+  inviteId?: Types.ObjectId;
+  maxQuestions: number;
+  questionTimeSeconds: number;
+  silenceSeconds: number;
+}
 
 export interface IInterviewMetrics {
   technicalKnowledge: number;
@@ -24,6 +36,9 @@ export interface IInterview extends Document {
   overallScore: number;
   feedback: string;
   suggestions: string[];
+  strengths: string[];
+  focusAreas: string[];
+  liveMeta?: ILiveInterviewMeta;
   startedAt: Date;
   completedAt?: Date;
   createdAt: Date;
@@ -33,7 +48,7 @@ export interface IInterview extends Document {
 const interviewSchema = new Schema<IInterview>(
   {
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-    type: { type: String, enum: ['mock', 'voice', 'video'], required: true },
+    type: { type: String, enum: ['mock', 'voice', 'video', 'live'], required: true },
     domain: { type: String, enum: INTERVIEW_DOMAIN_IDS, required: true },
     status: { type: String, enum: ['in_progress', 'completed', 'abandoned'], default: 'in_progress' },
     questions: { type: [String], default: [] },
@@ -48,6 +63,19 @@ const interviewSchema = new Schema<IInterview>(
     overallScore: { type: Number, default: 0 },
     feedback: { type: String, default: '' },
     suggestions: { type: [String], default: [] },
+    strengths: { type: [String], default: [] },
+    focusAreas: { type: [String], default: [] },
+    liveMeta: {
+      companyName: String,
+      jobTitle: String,
+      jobId: { type: Schema.Types.ObjectId, ref: 'Job' },
+      jobDescription: String,
+      jobSkills: { type: [String], default: [] },
+      inviteId: { type: Schema.Types.ObjectId, ref: 'InterviewInvite' },
+      maxQuestions: { type: Number, default: 6 },
+      questionTimeSeconds: { type: Number, default: 120 },
+      silenceSeconds: { type: Number, default: 10 },
+    },
     startedAt: { type: Date, default: Date.now },
     completedAt: Date,
   },
