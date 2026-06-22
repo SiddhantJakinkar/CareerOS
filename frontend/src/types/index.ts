@@ -154,7 +154,9 @@ export interface CodingTest {
   description: string;
   duration: number;
   totalPoints: number;
-  questions: Array<{
+  isPersonalized?: boolean;
+  questionCount?: number;
+  questions?: Array<{
     id: string;
     type: string;
     question: string;
@@ -163,6 +165,26 @@ export interface CodingTest {
     difficulty: string;
     points: number;
   }>;
+}
+
+export interface AssessmentHubMeta {
+  academicStream: string;
+  streamLabel: string;
+  targetRole: string;
+  assessmentScore: number;
+  focusAreas: string[];
+  allowedCategories: string[];
+  categories: Array<{ id: string; label: string; count: number }>;
+  recommendedTestId: string | null;
+  recentWeakAreas: string[];
+  skills: string[];
+  branch: string | null;
+  degree: string | null;
+}
+
+export interface AssessmentHub {
+  tests: CodingTest[];
+  meta: AssessmentHubMeta;
 }
 
 export interface DashboardData {

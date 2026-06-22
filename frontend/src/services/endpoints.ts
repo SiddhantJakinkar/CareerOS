@@ -9,6 +9,7 @@ import type {
   Application,
   Interview,
   CodingTest,
+  AssessmentHub,
   DashboardData,
 } from '@/types';
 
@@ -161,8 +162,19 @@ export const voiceApi = {
 };
 
 export const codingApi = {
-  getTests: (category?: string) =>
-    api.get<ApiResponse<CodingTest[]>>('/tests', { params: category ? { category } : {} }),
+  getHub: () => api.get<ApiResponse<AssessmentHub>>('/tests'),
+  generatePersonalized: () =>
+    api.post<
+      ApiResponse<{
+        id: string;
+        title: string;
+        description?: string;
+        duration?: number;
+        totalPoints?: number;
+        category?: string;
+        isPersonalized?: boolean;
+      }>
+    >('/tests/personalized/generate'),
   getTest: (id: string) => api.get<ApiResponse<CodingTest>>(`/tests/${id}`),
   submit: (data: { testId: string; answers: Array<{ questionId: string; answer: string; timeSpent: number }>; timeTaken: number }) =>
     api.post('/tests/submit', data),

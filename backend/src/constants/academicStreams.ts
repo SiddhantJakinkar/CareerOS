@@ -121,6 +121,50 @@ export function getReadinessWeights(stream?: string | null) {
   return { ats: 0.35, assessment: 0.2, interview: 0.25, jobMatch: 0.2 };
 }
 
+export function getAssessmentCategoriesForStream(stream?: string | null): string[] {
+  const universal = ['aptitude', 'verbal', 'quantitative'];
+  switch (stream) {
+    case 'engineering':
+      return [...universal, 'dsa', 'java', 'python', 'sql', 'javascript'];
+    case 'commerce':
+      return [...universal, 'business', 'finance'];
+    case 'management':
+      return [...universal, 'business', 'finance'];
+    case 'arts':
+      return [...universal, 'communication', 'verbal'];
+    case 'science':
+      return [...universal, 'research', 'quantitative'];
+    case 'law':
+      return [...universal, 'legal', 'verbal'];
+    case 'healthcare':
+      return [...universal, 'healthcare', 'verbal'];
+    default:
+      return [...universal, 'business', 'dsa', 'java', 'python'];
+  }
+}
+
+export function getAssessmentFocusAreas(stream?: string | null, targetRole?: string | null): string[] {
+  const role = targetRole?.trim() || getDefaultTargetRole(stream);
+  switch (stream) {
+    case 'engineering':
+      return ['Data structures & algorithms', 'Programming fundamentals', 'Aptitude & logic', role];
+    case 'commerce':
+      return ['Quantitative aptitude', 'Accounts & finance basics', 'Business reasoning', role];
+    case 'management':
+      return ['Case-style reasoning', 'Business aptitude', 'Verbal ability', role];
+    case 'arts':
+      return ['Verbal & communication', 'Reading comprehension', 'General aptitude', role];
+    case 'science':
+      return ['Scientific reasoning', 'Quantitative analysis', 'Research aptitude', role];
+    case 'law':
+      return ['Legal reasoning', 'Reading comprehension', 'Analytical aptitude', role];
+    case 'healthcare':
+      return ['Clinical knowledge basics', 'Ethics & communication', 'Aptitude', role];
+    default:
+      return ['Aptitude', 'Verbal ability', 'Domain fundamentals', role];
+  }
+}
+
 export function getDomainsForStream(stream?: string | null): string[] {
   const universal = ['hr', 'aptitude'];
   switch (stream) {

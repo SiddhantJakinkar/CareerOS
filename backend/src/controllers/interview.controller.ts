@@ -12,7 +12,7 @@ import {
   logActivity,
   updatePlacementReadiness,
 } from '../services/recommendation.service.js';
-import { Profile } from '../models/Profile.js';
+import { Profile, type IProfile } from '../models/Profile.js';
 import {
   DOMAIN_LABELS,
   INTERVIEW_DOMAIN_IDS,
@@ -23,6 +23,7 @@ import { VIDEO_INTERVIEW_CONFIG } from '../constants/videoInterview.js';
 import { uploadVideoToCloudinary } from '../config/cloudinary.js';
 import { transcribeAudio } from '../ai/whisper.service.js';
 import { finalizeInterview } from './interview.controller.helpers.js';
+import { cacheGetOrSet, CacheKey, CacheTTL } from '../utils/cache.js';
 
 export const startInterviewSchema = z.object({
   domain: z.enum(INTERVIEW_DOMAIN_IDS),
@@ -90,8 +91,12 @@ async function applyAnswerEvaluation(
 
 export async function getInterviewDomains(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const profile = await Profile.findOne({ userId: req.user!.userId });
-    res.json({ success: true, data: getInterviewDomainsPayload(profile) });
+    const userId = req.user!.userId;
+    const data = await cacheGetOrSet(CacheKey.interviewDomains(userId), CacheTTL.MEDIUM, async () => {
+      const profile = await Profile.findOne({ userId }).lean();
+      return getInterviewDomainsPayload(profile as IProfile | null);
+    });
+    res.json({ success: true, data });
   } catch (error) {
     next(error);
   }

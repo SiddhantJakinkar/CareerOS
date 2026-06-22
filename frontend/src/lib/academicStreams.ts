@@ -95,8 +95,8 @@ export function getReadinessFactors(stream?: string | null): string {
   return 'ATS, aptitude, interview, and job match scores';
 }
 
-export function getAssessmentNavLabel(stream?: string | null): string {
-  return isTechStream(stream) ? 'Coding Assessment' : 'Aptitude & Assessments';
+export function getAssessmentNavLabel(_stream?: string | null): string {
+  return 'Assessments';
 }
 
 export function getSuggestedPrompts(stream?: string | null): string[] {
@@ -125,8 +125,15 @@ export function getSuggestedPrompts(stream?: string | null): string[] {
   ];
 }
 
-export function getAssessmentPageTitle(stream?: string | null): string {
-  return isTechStream(stream) ? 'Coding Assessment' : 'Aptitude & Assessments';
+export function getAssessmentPageTitle(_stream?: string | null): string {
+  return 'Assessments';
+}
+
+export function getAssessmentSubtitle(stream?: string | null, targetRole?: string | null): string {
+  if (targetRole) {
+    return `Personalized practice for your ${getStreamLabel(stream)} path toward ${targetRole}`;
+  }
+  return `Practice tests tailored to your ${getStreamLabel(stream)} profile and placement goals`;
 }
 
 export function getAssessmentPerformanceLabel(stream?: string | null): string {

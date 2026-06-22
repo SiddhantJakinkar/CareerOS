@@ -4,6 +4,7 @@ import { CodingResult } from '../models/CodingResult.js';
 import { Interview } from '../models/Interview.js';
 import { logger } from '../utils/logger.js';
 import { getAllSkillsFromProfile, getReadinessWeights, isTechStream } from '../constants/academicStreams.js';
+import { invalidateUserCaches } from '../utils/cache.js';
 
 export function getAllSkills(profile: IProfile): string[] {
   return getAllSkillsFromProfile(profile);
@@ -133,6 +134,7 @@ export async function updatePlacementReadiness(userId: string): Promise<number> 
   );
   profile.placementReadinessScore = score;
   await profile.save();
+  invalidateUserCaches(userId);
 
   return score;
 }

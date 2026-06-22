@@ -1,6 +1,22 @@
-import mongoose, { Document, Schema } from 'mongoose';
+import mongoose, { Document, Schema, Types } from 'mongoose';
 
-export type TestCategory = 'dsa' | 'java' | 'python' | 'sql' | 'javascript' | 'aptitude' | 'verbal' | 'quantitative';
+export type TestCategory =
+  | 'dsa'
+  | 'java'
+  | 'python'
+  | 'sql'
+  | 'javascript'
+  | 'aptitude'
+  | 'verbal'
+  | 'quantitative'
+  | 'business'
+  | 'finance'
+  | 'legal'
+  | 'healthcare'
+  | 'research'
+  | 'communication'
+  | 'personalized';
+
 export type QuestionType = 'mcq' | 'coding';
 
 export interface ITestQuestion {
@@ -23,6 +39,12 @@ export interface ICodingTest extends Document {
   questions: ITestQuestion[];
   totalPoints: number;
   isActive: boolean;
+  isPersonalized?: boolean;
+  personalizedFor?: {
+    userId?: Types.ObjectId;
+    academicStream?: string;
+    targetRole?: string;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -31,7 +53,23 @@ const codingTestSchema = new Schema<ICodingTest>(
   {
     category: {
       type: String,
-      enum: ['dsa', 'java', 'python', 'sql', 'javascript', 'aptitude', 'verbal', 'quantitative'],
+      enum: [
+        'dsa',
+        'java',
+        'python',
+        'sql',
+        'javascript',
+        'aptitude',
+        'verbal',
+        'quantitative',
+        'business',
+        'finance',
+        'legal',
+        'healthcare',
+        'research',
+        'communication',
+        'personalized',
+      ],
       required: true,
     },
     title: { type: String, required: true },
@@ -52,6 +90,12 @@ const codingTestSchema = new Schema<ICodingTest>(
     ],
     totalPoints: { type: Number, default: 100 },
     isActive: { type: Boolean, default: true },
+    isPersonalized: { type: Boolean, default: false },
+    personalizedFor: {
+      userId: { type: Schema.Types.ObjectId, ref: 'User' },
+      academicStream: String,
+      targetRole: String,
+    },
   },
   { timestamps: true }
 );

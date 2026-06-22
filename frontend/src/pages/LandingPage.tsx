@@ -52,8 +52,8 @@ const features = [
   },
   {
     icon: Code2,
-    title: 'Coding Assessments',
-    description: 'Practice aptitude and coding tests with instant evaluation to boost your placement readiness score.',
+    title: 'Assessments',
+    description: 'Stream-aware aptitude, domain, and personalized AI assessments for placement readiness.',
   },
   {
     icon: Share2,

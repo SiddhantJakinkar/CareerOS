@@ -9,6 +9,7 @@ import routes from './routes/index.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { generalLimiter } from './middleware/rateLimiter.js';
 import { startScheduler } from './scheduler/index.js';
+import { seedAssessmentTestsIfNeeded } from './controllers/coding.controller.js';
 import { logger } from './utils/logger.js';
 
 const app = express();
@@ -32,6 +33,7 @@ app.use(errorHandler);
 
 async function bootstrap(): Promise<void> {
   await connectDatabase();
+  await seedAssessmentTestsIfNeeded();
   startScheduler();
 
   app.listen(Number(env.PORT), () => {

@@ -5,6 +5,7 @@ import { User } from '../models/User.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { logActivity } from '../services/recommendation.service.js';
 import { ACADEMIC_STREAM_IDS } from '../constants/academicStreams.js';
+import { cacheGetOrSet, CacheKey, CacheTTL, invalidateUserCaches } from '../utils/cache.js';
 
 export const profileUpdateSchema = z.object({
   academicStream: z.enum(ACADEMIC_STREAM_IDS).optional(),
@@ -56,8 +57,12 @@ export const onboardingSchema = profileUpdateSchema.extend({
 
 export async function getProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const profile = await Profile.findOne({ userId: req.user!.userId });
-    if (!profile) throw new AppError('Profile not found', 404);
+    const userId = req.user!.userId;
+    const profile = await cacheGetOrSet(CacheKey.profile(userId), CacheTTL.MEDIUM, async () => {
+      const doc = await Profile.findOne({ userId }).lean();
+      if (!doc) throw new AppError('Profile not found', 404);
+      return doc;
+    });
     res.json({ success: true, data: profile });
   } catch (error) {
     next(error);
@@ -80,6 +85,7 @@ export async function updateProfile(req: Request, res: Response, next: NextFunct
     );
 
     await logActivity(userId, 'update', 'profile', profile!._id.toString());
+    invalidateUserCaches(userId);
     res.json({ success: true, data: profile });
   } catch (error) {
     next(error);
@@ -104,6 +110,7 @@ export async function completeOnboarding(req: Request, res: Response, next: Next
     await User.findByIdAndUpdate(userId, { onboardingCompleted: true });
     await logActivity(userId, 'complete', 'onboarding');
 
+    invalidateUserCaches(userId);
     res.json({ success: true, data: profile });
   } catch (error) {
     next(error);

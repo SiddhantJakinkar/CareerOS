@@ -361,6 +361,71 @@ export function getFallbackOverallReview(
   };
 }
 
+export interface GeneratedAssessmentQuestion {
+  id: string;
+  type: 'mcq';
+  question: string;
+  options: string[];
+  correctAnswer: string;
+  explanation: string;
+  topic: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  points: number;
+}
+
+export interface GeneratedAssessment {
+  title: string;
+  description: string;
+  duration: number;
+  questions: GeneratedAssessmentQuestion[];
+}
+
+const PERSONALIZED_ASSESSMENT_PROMPT = `You are an expert placement assessment designer for Indian students and freshers.
+Create a personalized multiple-choice assessment tailored to the candidate's academic stream, target role, and skills.
+Return JSON with:
+- title: string (specific to their goal, e.g. "Accounts Executive Readiness Assessment")
+- description: string (1-2 sentences)
+- duration: number (minutes, 30-45)
+- questions: array of 15 items, each with:
+  - id: string (unique, e.g. "p-1")
+  - type: "mcq"
+  - question: string
+  - options: string[] (exactly 4 options)
+  - correctAnswer: string (must exactly match one option)
+  - explanation: string
+  - topic: string
+  - difficulty: "easy" | "medium" | "hard"
+  - points: number (10 for easy, 12 for medium, 15 for hard)
+Mix aptitude, domain knowledge, and role-relevant scenarios. No trick questions.`;
+
+export async function generatePersonalizedAssessment(
+  userId: string,
+  context: {
+    academicStream: string;
+    streamLabel: string;
+    targetRole: string;
+    branch?: string;
+    degree?: string;
+    skills: string[];
+    weakAreas?: string[];
+  }
+): Promise<GeneratedAssessment> {
+  const skillsText = context.skills.length ? context.skills.join(', ') : 'Not specified';
+  const weakText = context.weakAreas?.length ? context.weakAreas.join(', ') : 'None yet';
+
+  return geminiService.generateJSON<GeneratedAssessment>(
+    userId,
+    'interview_evaluation',
+    PERSONALIZED_ASSESSMENT_PROMPT,
+    `Academic stream: ${context.streamLabel} (${context.academicStream})
+Target role: ${context.targetRole}
+Degree: ${context.degree ?? 'N/A'}
+Branch / specialization: ${context.branch ?? 'N/A'}
+Skills: ${skillsText}
+Previous weak areas: ${weakText}`
+  );
+}
+
 export interface SkillGapResult {
   currentSkills: string[];
   requiredSkills: string[];

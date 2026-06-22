@@ -18,8 +18,8 @@ export function TopNavbar() {
       return res.data.data;
     },
     enabled: isAuthenticated,
-    staleTime: 60 * 1000,
-    refetchInterval: 120 * 1000,
+    staleTime: 2 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
     retry: false,
   });
 
