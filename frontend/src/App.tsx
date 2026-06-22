@@ -4,12 +4,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { ProtectedRoute, AuthRoute, OnboardingRoute } from '@/components/layout/ProtectedRoute';
+import { AuthBootstrap } from '@/components/layout/AuthBootstrap';
 import { CounselorRoute } from '@/components/layout/CounselorRoute';
 import { PageSkeleton } from '@/components/ui/skeleton';
 
 const LandingPage = lazy(() => import('@/pages/LandingPage'));
 const LoginPage = lazy(() => import('@/pages/auth/LoginPage'));
 const RegisterPage = lazy(() => import('@/pages/auth/RegisterPage'));
+const VerifyEmailPage = lazy(() => import('@/pages/auth/VerifyEmailPage'));
 const OnboardingPage = lazy(() => import('@/pages/onboarding/OnboardingPage'));
 const DashboardPage = lazy(() => import('@/pages/dashboard/DashboardPage'));
 const JobSearchPage = lazy(() => import('@/pages/jobs/JobSearchPage'));
@@ -53,7 +55,9 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
+        <AuthBootstrap>
         <Routes>
+          <Route path="/verify-email" element={<LazyPage><VerifyEmailPage /></LazyPage>} />
           <Route element={<AuthRoute />}>
             <Route path="/login" element={<LazyPage><LoginPage /></LazyPage>} />
             <Route path="/register" element={<LazyPage><RegisterPage /></LazyPage>} />
@@ -95,6 +99,7 @@ export default function App() {
           <Route path="/" element={<LazyPage><LandingPage /></LazyPage>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </AuthBootstrap>
       </BrowserRouter>
       <Toaster theme="dark" position="top-right" richColors />
     </QueryClientProvider>

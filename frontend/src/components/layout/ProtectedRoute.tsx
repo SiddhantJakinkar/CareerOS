@@ -1,12 +1,11 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuthStore } from '@/store';
+import { getAccessToken } from '@/services/tokenMemory';
 
 export function ProtectedRoute() {
   const { isAuthenticated, user, logout } = useAuthStore();
 
-  // Zustand may persist isAuthenticated:true but tokens can be missing (e.g. after
-  // a password change, backend restart, or partial localStorage clear). Force logout.
-  const hasToken = Boolean(localStorage.getItem('accessToken'));
+  const hasToken = Boolean(getAccessToken());
   if (isAuthenticated && !hasToken) {
     logout();
     return <Navigate to="/login" replace />;

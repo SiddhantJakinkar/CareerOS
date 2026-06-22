@@ -14,12 +14,18 @@ import type {
 } from '@/types';
 
 export const authApi = {
+  getCsrf: () => api.get<ApiResponse<{ csrfToken: string }>>('/auth/csrf'),
   register: (data: { name: string; email: string; password: string }) =>
     api.post<ApiResponse<AuthResponse>>('/auth/register', data),
   login: (data: { email: string; password: string }) =>
     api.post<ApiResponse<AuthResponse>>('/auth/login', data),
   google: (credential: string) =>
     api.post<ApiResponse<AuthResponse>>('/auth/google', { credential }),
+  verifyTwoFactor: (data: { twoFactorToken: string; code: string }) =>
+    api.post<ApiResponse<AuthResponse>>('/auth/2fa/verify', data),
+  verifyEmail: (token: string) =>
+    api.post<ApiResponse<{ message: string }>>('/auth/verify-email', { token }),
+  resendVerification: () => api.post('/auth/verify-email/resend'),
   logout: () => api.post('/auth/logout'),
   me: () => api.get<ApiResponse<{ user: User; profile: Profile }>>('/auth/me'),
 };

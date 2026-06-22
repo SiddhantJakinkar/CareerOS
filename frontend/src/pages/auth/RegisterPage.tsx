@@ -37,7 +37,7 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       const res = await authApi.register(data);
-      setAuth(res.data.data.user, res.data.data.accessToken, res.data.data.refreshToken);
+      setAuth(res.data.data.user, res.data.data.accessToken!, res.data.data.csrfToken);
       toast.success('Account created successfully!');
       navigate('/onboarding');
     } catch (error) {

@@ -1,16 +1,28 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
+import {
+  clearTokens,
+  getAccessToken,
+  getCsrfToken,
+  setAccessToken,
+  setCsrfToken,
+} from './tokenMemory';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 export const api = axios.create({
   baseURL: API_URL,
+  withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
 });
 
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const token = localStorage.getItem('accessToken');
+  const token = getAccessToken();
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+  const csrf = getCsrfToken();
+  if (csrf && config.headers && ['post', 'put', 'patch', 'delete'].includes(config.method ?? '')) {
+    config.headers['X-CSRF-Token'] = csrf;
   }
   return config;
 });
@@ -27,6 +39,30 @@ function onTokenRefreshed(token: string) {
   refreshSubscribers = [];
 }
 
+export async function refreshSession(): Promise<string | null> {
+  try {
+    const csrfRes = await axios.get(`${API_URL}/auth/csrf`, { withCredentials: true });
+    const csrf = csrfRes.data?.data?.csrfToken as string | undefined;
+    if (csrf) setCsrfToken(csrf);
+
+    const { data } = await axios.post(
+      `${API_URL}/auth/refresh`,
+      {},
+      {
+        withCredentials: true,
+        headers: csrf ? { 'X-CSRF-Token': csrf } : {},
+      }
+    );
+    const newAccess: string = data.data.accessToken;
+    const newCsrf: string | undefined = data.data.csrfToken;
+    setAccessToken(newAccess);
+    if (newCsrf) setCsrfToken(newCsrf);
+    return newAccess;
+  } catch {
+    return null;
+  }
+}
+
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
@@ -34,13 +70,6 @@ api.interceptors.response.use(
 
     if (error.response?.status === 401 && !original._retry) {
       original._retry = true;
-      const refreshToken = localStorage.getItem('refreshToken');
-
-      if (!refreshToken) {
-        localStorage.removeItem('accessToken');
-        window.location.href = '/login';
-        return Promise.reject(error);
-      }
 
       if (isRefreshing) {
         return new Promise((resolve) => {
@@ -53,18 +82,13 @@ api.interceptors.response.use(
 
       isRefreshing = true;
       try {
-        const { data } = await axios.post(`${API_URL}/auth/refresh`, { refreshToken });
-        const newAccess: string = data.data.accessToken;
-        const newRefresh: string = data.data.refreshToken;
-        localStorage.setItem('accessToken', newAccess);
-        localStorage.setItem('refreshToken', newRefresh);
+        const newAccess = await refreshSession();
+        if (!newAccess) throw new Error('refresh failed');
         if (original.headers) original.headers.Authorization = `Bearer ${newAccess}`;
         onTokenRefreshed(newAccess);
         return api(original);
       } catch {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        // Clear Zustand store so isAuthenticated goes false
+        clearTokens();
         const { useAuthStore } = await import('@/store');
         useAuthStore.getState().logout();
         window.location.href = '/login';

@@ -100,15 +100,24 @@ db.users.updateOne({ email: "counselor@college.edu" }, { $set: { role: "counselo
 
 Roles: `user` (default), `counselor`, `admin`
 
-## Security
+## Security & Production Upgrades
 
-- JWT access (15min) + refresh (7d) tokens
-- bcrypt password hashing (12 rounds)
-- Rate limiting per endpoint category
-- Helmet security headers
-- Zod input validation
-- AI prompt injection protection
-- Cloudinary signed uploads
+- **httpOnly refresh cookies** — refresh token not stored in `localStorage` (XSS-safe)
+- **CSRF protection** — double-submit token on cookie-auth routes (`/auth/refresh`, `/auth/logout`)
+- **Access token in memory** — short-lived JWT kept in session memory only
+- **Redis cache** (optional `REDIS_URL`) — shared cache across instances; falls back to in-memory
+- **API versioning** — `/api/v1/*` and `/api/*` (same routes)
+- **Helmet CSP** — Content-Security-Policy headers
+- **Audit logging** — security events in `AuditLog` collection
+- **Email verification** — on register (SMTP optional; dev logs link)
+- **2FA (TOTP)** — admin/counselor accounts via `/auth/2fa/setup`
+- **File upload validation** — MIME + magic-byte checks for resumes
+- **Sentry** (optional `SENTRY_DSN`) — error monitoring
+- bcrypt password hashing, rate limiting, Zod validation, AI prompt sanitization
+
+### Optional env vars
+
+See `backend/.env.example` for `REDIS_URL`, `SENTRY_DSN`, and `SMTP_*` settings.
 
 ## License
 

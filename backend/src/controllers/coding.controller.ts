@@ -48,7 +48,7 @@ export async function seedAssessmentTestsIfNeeded(): Promise<void> {
       { upsert: true }
     );
   }
-  invalidateAssessmentCatalog();
+  await invalidateAssessmentCatalog();
   assessmentTestsSeeded = true;
 }
 
@@ -180,9 +180,9 @@ export async function submitTest(req: Request, res: Response, next: NextFunction
     });
 
     await logActivity(userId, 'complete', 'coding_test', result._id.toString());
-    cacheDel(CacheKey.assessmentTest(testId));
+    await cacheDel(CacheKey.assessmentTest(testId));
     if (test.isPersonalized) {
-      cacheDel(CacheKey.assessmentTest(`${testId}:${userId}`));
+      await cacheDel(CacheKey.assessmentTest(`${testId}:${userId}`));
     }
     res.json({ success: true, data: result });
   } catch (error) {

@@ -12,30 +12,72 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { authApi } from '@/services/endpoints';
 import { useAuthStore } from '@/store';
 import { getErrorMessage } from '@/services/api';
+import type { User } from '@/types';
 
 const schema = z.object({
   email: z.string().email('Invalid email'),
   password: z.string().min(1, 'Password required'),
 });
 
+const twoFactorSchema = z.object({
+  code: z.string().length(6, 'Enter 6-digit code'),
+});
+
 type FormData = z.infer<typeof schema>;
+type TwoFactorData = z.infer<typeof twoFactorSchema>;
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const setAuth = useAuthStore((s) => s.setAuth);
   const [loading, setLoading] = useState(false);
+  const [twoFactor, setTwoFactor] = useState<{ token: string; user: User } | null>(null);
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
   });
 
+  const twoFactorForm = useForm<TwoFactorData>({
+    resolver: zodResolver(twoFactorSchema),
+  });
+
+  const finishLogin = (user: User, accessToken?: string, csrfToken?: string) => {
+    if (!accessToken) {
+      toast.error('Login failed — no access token');
+      return;
+    }
+    setAuth(user, accessToken, csrfToken);
+    toast.success('Welcome back!');
+    navigate(user.onboardingCompleted ? '/dashboard' : '/onboarding');
+  };
+
   const onSubmit = async (data: FormData) => {
     setLoading(true);
     try {
       const res = await authApi.login(data);
-      setAuth(res.data.data.user, res.data.data.accessToken, res.data.data.refreshToken);
-      toast.success('Welcome back!');
-      navigate(res.data.data.user.onboardingCompleted ? '/dashboard' : '/onboarding');
+      const payload = res.data.data;
+      if (payload.requiresTwoFactor && payload.twoFactorToken) {
+        setTwoFactor({ token: payload.twoFactorToken, user: payload.user });
+        toast.message('Enter your authenticator code');
+        return;
+      }
+      finishLogin(payload.user, payload.accessToken, payload.csrfToken);
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onTwoFactor = async (data: TwoFactorData) => {
+    if (!twoFactor) return;
+    setLoading(true);
+    try {
+      const res = await authApi.verifyTwoFactor({
+        twoFactorToken: twoFactor.token,
+        code: data.code,
+      });
+      const payload = res.data.data;
+      finishLogin(payload.user, payload.accessToken, payload.csrfToken);
     } catch (error) {
       toast.error(getErrorMessage(error));
     } finally {
@@ -60,17 +102,37 @@ export default function LoginPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Sign In</CardTitle>
-            <CardDescription>Enter your credentials to continue</CardDescription>
+            <CardTitle>{twoFactor ? 'Two-Factor Authentication' : 'Sign In'}</CardTitle>
+            <CardDescription>
+              {twoFactor ? 'Enter the code from your authenticator app' : 'Enter your credentials to continue'}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              <Input label="Email" type="email" error={errors.email?.message} {...register('email')} />
-              <Input label="Password" type="password" error={errors.password?.message} {...register('password')} />
-              <Button type="submit" className="w-full" loading={loading}>
-                Sign In
-              </Button>
-            </form>
+            {twoFactor ? (
+              <form onSubmit={twoFactorForm.handleSubmit(onTwoFactor)} className="space-y-4">
+                <Input
+                  label="Authenticator code"
+                  inputMode="numeric"
+                  maxLength={6}
+                  error={twoFactorForm.formState.errors.code?.message}
+                  {...twoFactorForm.register('code')}
+                />
+                <Button type="submit" className="w-full" loading={loading}>
+                  Verify & Sign In
+                </Button>
+                <Button type="button" variant="ghost" className="w-full" onClick={() => setTwoFactor(null)}>
+                  Back
+                </Button>
+              </form>
+            ) : (
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                <Input label="Email" type="email" error={errors.email?.message} {...register('email')} />
+                <Input label="Password" type="password" error={errors.password?.message} {...register('password')} />
+                <Button type="submit" className="w-full" loading={loading}>
+                  Sign In
+                </Button>
+              </form>
+            )}
             <p className="mt-6 text-center text-sm text-text-muted">
               Don&apos;t have an account?{' '}
               <Link to="/register" className="text-primary hover:underline">

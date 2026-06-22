@@ -4,12 +4,17 @@ export interface User {
   email: string;
   role: string;
   onboardingCompleted: boolean;
+  isEmailVerified?: boolean;
+  totpEnabled?: boolean;
 }
 
 export interface AuthResponse {
   user: User;
-  accessToken: string;
-  refreshToken: string;
+  accessToken?: string;
+  csrfToken?: string;
+  refreshToken?: string;
+  requiresTwoFactor?: boolean;
+  twoFactorToken?: string;
 }
 
 export interface ApiResponse<T> {

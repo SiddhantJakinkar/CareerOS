@@ -85,7 +85,7 @@ export async function updateProfile(req: Request, res: Response, next: NextFunct
     );
 
     await logActivity(userId, 'update', 'profile', profile!._id.toString());
-    invalidateUserCaches(userId);
+    await invalidateUserCaches(userId);
     res.json({ success: true, data: profile });
   } catch (error) {
     next(error);
@@ -110,7 +110,7 @@ export async function completeOnboarding(req: Request, res: Response, next: Next
     await User.findByIdAndUpdate(userId, { onboardingCompleted: true });
     await logActivity(userId, 'complete', 'onboarding');
 
-    invalidateUserCaches(userId);
+    await invalidateUserCaches(userId);
     res.json({ success: true, data: profile });
   } catch (error) {
     next(error);

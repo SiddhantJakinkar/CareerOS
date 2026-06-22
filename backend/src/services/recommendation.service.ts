@@ -134,7 +134,7 @@ export async function updatePlacementReadiness(userId: string): Promise<number> 
   );
   profile.placementReadinessScore = score;
   await profile.save();
-  invalidateUserCaches(userId);
+  await invalidateUserCaches(userId);
 
   return score;
 }

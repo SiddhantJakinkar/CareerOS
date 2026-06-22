@@ -13,6 +13,7 @@ import {
 } from '../services/recommendation.service.js';
 import { Job } from '../models/Job.js';
 import { z } from 'zod';
+import { assertAllowedExtension, assertFileSignature } from '../utils/fileValidation.js';
 
 export const generateResumeSchema = z.object({
   jobId: z.string().min(1),
@@ -21,6 +22,9 @@ export const generateResumeSchema = z.object({
 export async function uploadResume(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     if (!req.file) throw new AppError('No file uploaded', 400);
+
+    assertAllowedExtension(req.file.originalname, ['pdf', 'docx']);
+    assertFileSignature(req.file.buffer, req.file.mimetype);
 
     const userId = req.user!.userId;
     const { url, publicId } = await uploadToCloudinary(req.file.buffer, 'resumes');

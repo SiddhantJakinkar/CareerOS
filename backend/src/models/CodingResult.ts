@@ -50,4 +50,6 @@ const codingResultSchema = new Schema<ICodingResult>(
   { timestamps: { createdAt: true, updatedAt: false } }
 );
 
+codingResultSchema.index({ userId: 1, completedAt: -1 });
+
 export const CodingResult = mongoose.model<ICodingResult>('CodingResult', codingResultSchema);

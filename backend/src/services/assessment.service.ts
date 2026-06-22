@@ -264,7 +264,7 @@ export async function generatePersonalizedTest(userId: string) {
     },
   });
 
-  cacheDel(CacheKey.assessmentHub(userId));
+  await cacheDel(CacheKey.assessmentHub(userId));
 
   return test;
 }

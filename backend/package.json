@@ -8,10 +8,12 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "lint": "eslint src --ext .ts",
-    "db:setup": "tsx scripts/setup-db.mts"
+    "db:setup": "tsx scripts/setup-db.mts",
+    "test": "tsx --test src/tests/**/*.test.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
+    "@sentry/node": "^10.59.0",
     "bcrypt": "^5.1.1",
     "cloudinary": "^2.5.1",
     "cookie-parser": "^1.4.7",
@@ -25,7 +27,10 @@
     "mongoose": "^8.9.3",
     "multer": "^1.4.5-lts.1",
     "node-cron": "^3.0.3",
+    "nodemailer": "^9.0.1",
+    "otplib": "^13.4.1",
     "pdf-parse": "^1.1.1",
+    "redis": "^6.0.0",
     "uuid": "^11.0.3",
     "winston": "^3.17.0",
     "zod": "^3.24.1"
@@ -39,6 +44,7 @@
     "@types/multer": "^1.4.12",
     "@types/node": "^22.10.2",
     "@types/node-cron": "^3.0.11",
+    "@types/nodemailer": "^8.0.1",
     "@types/pdf-parse": "^1.1.4",
     "@types/uuid": "^10.0.0",
     "tsx": "^4.19.2",

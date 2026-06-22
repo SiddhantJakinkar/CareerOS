@@ -7,6 +7,10 @@ export interface IUser extends Document {
   googleId?: string;
   role: 'user' | 'admin' | 'counselor';
   isEmailVerified: boolean;
+  emailVerificationToken?: string;
+  emailVerificationExpires?: Date;
+  totpEnabled: boolean;
+  totpSecret?: string;
   onboardingCompleted: boolean;
   failedLoginAttempts: number;
   lockUntil?: Date;
@@ -19,11 +23,15 @@ export interface IUser extends Document {
 const userSchema = new Schema<IUser>(
   {
     name: { type: String, required: true, trim: true },
-    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },
     password: { type: String, select: false },
-    googleId: { type: String, sparse: true },
-    role: { type: String, enum: ['user', 'admin', 'counselor'], default: 'user' },
+    googleId: { type: String, sparse: true, index: true },
+    role: { type: String, enum: ['user', 'admin', 'counselor'], default: 'user', index: true },
     isEmailVerified: { type: Boolean, default: false },
+    emailVerificationToken: { type: String, select: false },
+    emailVerificationExpires: { type: Date, select: false },
+    totpEnabled: { type: Boolean, default: false },
+    totpSecret: { type: String, select: false },
     onboardingCompleted: { type: Boolean, default: false },
     failedLoginAttempts: { type: Number, default: 0 },
     lockUntil: { type: Date },
@@ -31,6 +39,8 @@ const userSchema = new Schema<IUser>(
   },
   { timestamps: true }
 );
+
+userSchema.index({ emailVerificationToken: 1 }, { sparse: true });
 
 userSchema.virtual('isLocked').get(function (this: IUser) {
   return !!(this.lockUntil && this.lockUntil > new Date());

@@ -36,6 +36,9 @@ const inviteSchema = new Schema<IInterviewInvite>(
   { timestamps: true }
 );
 
+inviteSchema.index({ expiresAt: 1 });
+inviteSchema.index({ status: 1, expiresAt: 1 });
+
 export function generateInviteToken(): string {
   return crypto.randomBytes(24).toString('hex');
 }

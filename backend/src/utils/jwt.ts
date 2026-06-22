@@ -19,10 +19,22 @@ export function generateRefreshToken(payload: TokenPayload): string {
   });
 }
 
+export function generateTwoFactorToken(userId: string): string {
+  return jwt.sign({ userId, purpose: '2fa' }, env.JWT_SECRET, { expiresIn: '5m' });
+}
+
 export function verifyAccessToken(token: string): TokenPayload {
   return jwt.verify(token, env.JWT_SECRET) as TokenPayload;
 }
 
 export function verifyRefreshToken(token: string): TokenPayload {
   return jwt.verify(token, env.JWT_REFRESH_SECRET) as TokenPayload;
+}
+
+export function verifyTwoFactorToken(token: string): { userId: string } {
+  const payload = jwt.verify(token, env.JWT_SECRET) as { userId: string; purpose?: string };
+  if (payload.purpose !== '2fa') {
+    throw new Error('Invalid two-factor token');
+  }
+  return { userId: payload.userId };
 }

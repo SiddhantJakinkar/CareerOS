@@ -4,6 +4,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { connectDatabase } from './config/database.js';
+import { connectRedis } from './config/redis.js';
+import { initSentry } from './config/sentry.js';
 import { env } from './config/env.js';
 import routes from './routes/index.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
@@ -12,9 +14,28 @@ import { startScheduler } from './scheduler/index.js';
 import { seedAssessmentTestsIfNeeded } from './controllers/coding.controller.js';
 import { logger } from './utils/logger.js';
 
+initSentry();
+
 const app = express();
 
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        connectSrc: ["'self'", env.FRONTEND_URL, 'https://*.sentry.io'],
+        fontSrc: ["'self'", 'data:'],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+      },
+    },
+    crossOriginEmbedderPolicy: false,
+  })
+);
+
 app.use(
   cors({
     origin: env.FRONTEND_URL,
@@ -26,6 +47,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 app.use(generalLimiter);
 
+app.use('/api/v1', routes);
 app.use('/api', routes);
 
 app.use(notFoundHandler);
@@ -33,6 +55,7 @@ app.use(errorHandler);
 
 async function bootstrap(): Promise<void> {
   await connectDatabase();
+  await connectRedis();
   await seedAssessmentTestsIfNeeded();
   startScheduler();
 

@@ -20,7 +20,7 @@ export async function markAsRead(req: Request, res: Response, next: NextFunction
       { _id: req.params.id, userId },
       { isRead: true }
     );
-    cacheDel(CacheKey.notifUnread(userId));
+    await cacheDel(CacheKey.notifUnread(userId));
     res.json({ success: true });
   } catch (error) {
     next(error);
@@ -31,7 +31,7 @@ export async function markAllRead(req: Request, res: Response, next: NextFunctio
   try {
     const userId = req.user!.userId;
     await Notification.updateMany({ userId }, { isRead: true });
-    cacheDel(CacheKey.notifUnread(userId));
+    await cacheDel(CacheKey.notifUnread(userId));
     res.json({ success: true });
   } catch (error) {
     next(error);
