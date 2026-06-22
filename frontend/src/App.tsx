@@ -7,6 +7,7 @@ import { ProtectedRoute, AuthRoute, OnboardingRoute } from '@/components/layout/
 import { CounselorRoute } from '@/components/layout/CounselorRoute';
 import { PageSkeleton } from '@/components/ui/skeleton';
 
+const LandingPage = lazy(() => import('@/pages/LandingPage'));
 const LoginPage = lazy(() => import('@/pages/auth/LoginPage'));
 const RegisterPage = lazy(() => import('@/pages/auth/RegisterPage'));
 const OnboardingPage = lazy(() => import('@/pages/onboarding/OnboardingPage'));
@@ -91,8 +92,8 @@ export default function App() {
             </Route>
           </Route>
 
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<LazyPage><LandingPage /></LazyPage>} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
       <Toaster theme="dark" position="top-right" richColors />
