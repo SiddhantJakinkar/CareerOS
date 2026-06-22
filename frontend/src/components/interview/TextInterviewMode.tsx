@@ -2,15 +2,33 @@ import { useEffect, useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-import { MessageSquare, Send } from 'lucide-react';
+import { MessageSquare, Send, CheckCircle2, TrendingUp } from 'lucide-react';
 import { interviewApi } from '@/services/endpoints';
 import { getErrorMessage } from '@/services/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import { CircularProgress } from '@/components/ui/motion';
 import { DomainSelector } from '@/components/interview/DomainSelector';
 import type { InterviewDomainsData } from '@/components/interview/DomainSelector';
+
+interface InterviewReport {
+  interview: {
+    overallScore: number;
+    feedback?: string;
+    metrics: Record<string, number>;
+    strengths?: string[];
+    focusAreas?: string[];
+    suggestions?: string[];
+  };
+  answers: Array<{
+    question: string;
+    answer: string;
+    score: number;
+    feedback?: string;
+  }>;
+}
 
 function domainLabel(domains: InterviewDomainsData['domains'], id: string): string {
   return domains.find((d) => d.id === id)?.label ?? id;
@@ -24,6 +42,8 @@ export function TextInterviewMode({ domains, recommended, reason, targetRole, ac
   const [feedback, setFeedback] = useState<Record<string, unknown> | null>(null);
   const [isComplete, setIsComplete] = useState(false);
   const [metrics, setMetrics] = useState<Record<string, number>>({});
+  const [report, setReport] = useState<InterviewReport | null>(null);
+  const [loadingReport, setLoadingReport] = useState(false);
 
   useEffect(() => {
     setDomain(recommended);
@@ -58,6 +78,13 @@ export function TextInterviewMode({ domains, recommended, reason, targetRole, ac
         setIsComplete(true);
         setCurrentQuestion('');
         toast.success(`Interview complete! Score: ${data.interview.overallScore}%`);
+        setLoadingReport(true);
+        const completedId = data.interview._id ?? interviewId;
+        interviewApi.getReport(completedId).then((res) => {
+          setReport(res.data.data as InterviewReport);
+        }).catch((e) => {
+          toast.error(getErrorMessage(e));
+        }).finally(() => setLoadingReport(false));
       } else {
         setCurrentQuestion(data.nextQuestion);
       }
@@ -142,14 +169,87 @@ export function TextInterviewMode({ domains, recommended, reason, targetRole, ac
       )}
 
       {isComplete && (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-2xl font-bold text-success">Interview Complete!</p>
-            <Button className="mt-4" onClick={() => { setInterviewId(''); setIsComplete(false); }}>
+        <div className="space-y-6">
+          {loadingReport ? (
+            <Card>
+              <CardContent className="py-12 text-center text-text-muted">Loading your report...</CardContent>
+            </Card>
+          ) : report ? (
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+              <Card className="border-success/30 bg-success/5">
+                <CardContent className="py-8 text-center">
+                  <CheckCircle2 className="mx-auto mb-3 h-12 w-12 text-success" />
+                  <h2 className="text-2xl font-bold">Interview Complete</h2>
+                  <CircularProgress value={report.interview.overallScore} size={100} className="mx-auto mt-4" />
+                  <p className="mt-2 text-lg font-semibold text-primary">{report.interview.overallScore}% Overall</p>
+                </CardContent>
+              </Card>
+
+              {report.interview.feedback && (
+                <Card>
+                  <CardHeader><CardTitle>Overall Review</CardTitle></CardHeader>
+                  <CardContent>
+                    <p className="whitespace-pre-line text-sm leading-relaxed text-text-secondary">
+                      {report.interview.feedback}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-primary" />
+                    Performance Breakdown
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {Object.entries(report.interview.metrics).map(([key, val]) => (
+                    <div key={key}>
+                      <div className="flex justify-between text-xs">
+                        <span className="capitalize">{key.replace(/([A-Z])/g, ' $1')}</span>
+                        <span>{val}%</span>
+                      </div>
+                      <Progress value={val} className="h-1.5" />
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader><CardTitle>Answer-by-Answer Review</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  {report.answers.map((a, i) => (
+                    <div key={i} className="rounded-xl border border-border p-4">
+                      <p className="text-sm font-medium">Q{i + 1}: {a.question}</p>
+                      <p className="mt-2 text-sm text-text-muted">{a.answer}</p>
+                      <div className="mt-2 flex items-center justify-between">
+                        <span className="text-xs text-text-secondary">{a.feedback}</span>
+                        <Badge variant="success">{a.score}%</Badge>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </motion.div>
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <p className="text-2xl font-bold text-success">Interview Complete!</p>
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="text-center">
+            <Button onClick={() => {
+              setInterviewId('');
+              setIsComplete(false);
+              setReport(null);
+            }}>
               Start New Interview
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
       {pastInterviews && pastInterviews.length > 0 && (

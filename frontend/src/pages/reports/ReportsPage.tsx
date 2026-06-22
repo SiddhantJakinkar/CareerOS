@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
-import { dashboardApi } from '@/services/endpoints';
+import { dashboardApi, codingApi } from '@/services/endpoints';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { PageSkeleton } from '@/components/ui/skeleton';
@@ -22,6 +22,17 @@ export default function ReportsPage() {
   const { data: reports } = useQuery({
     queryKey: ['reports'],
     queryFn: async () => (await dashboardApi.getReports()).data.data,
+  });
+
+  const { data: assessmentResults } = useQuery({
+    queryKey: ['assessment-results'],
+    queryFn: async () => (await codingApi.getResults()).data.data as Array<{
+      _id: string;
+      score: number;
+      percentage: number;
+      completedAt: string;
+      testId?: { title?: string; category?: string; isPersonalized?: boolean };
+    }>,
   });
 
   if (isLoading) return <PageSkeleton />;
@@ -84,6 +95,30 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader><CardTitle>Assessment History</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          {assessmentResults?.length ? (
+            assessmentResults.map((result) => (
+              <div key={result._id} className="flex items-center justify-between rounded-xl border border-border p-4">
+                <div>
+                  <p className="font-medium">{result.testId?.title ?? 'Assessment'}</p>
+                  <p className="text-xs text-text-muted">
+                    {result.testId?.category}
+                    {result.testId?.isPersonalized ? ' · Personalized' : ''}
+                    {' · '}
+                    {formatDate(result.completedAt)}
+                  </p>
+                </div>
+                <span className="font-bold text-primary">{result.percentage ?? result.score}%</span>
+              </div>
+            ))
+          ) : (
+            <p className="text-text-muted">No assessments completed yet</p>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader><CardTitle>All Reports</CardTitle></CardHeader>

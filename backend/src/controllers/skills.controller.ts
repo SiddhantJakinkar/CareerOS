@@ -6,7 +6,7 @@ import { Report } from '../models/Report.js';
 import { analyzeSkillGap, generateRoadmap } from '../ai/prompts/index.js';
 import { getAllSkills, logActivity, createNotification } from '../services/recommendation.service.js';
 import { AppError } from '../middleware/errorHandler.js';
-import { getDefaultTargetRole } from '../constants/academicStreams.js';
+import { getDefaultTargetRole, getStreamLabel } from '../constants/academicStreams.js';
 
 export const skillGapSchema = z.object({
   targetRole: z.string().optional(),
@@ -27,8 +27,14 @@ export async function getSkillGap(req: Request, res: Response, next: NextFunctio
       profile.careerPreferences.targetRole ||
       getDefaultTargetRole(profile.academicStream);
     const currentSkills = getAllSkills(profile);
+    const streamContext = {
+      academicStream: profile.academicStream,
+      streamLabel: getStreamLabel(profile.academicStream),
+      branch: profile.education?.branch,
+      targetRole,
+    };
 
-    const analysis = await analyzeSkillGap(userId, currentSkills, targetRole);
+    const analysis = await analyzeSkillGap(userId, currentSkills, targetRole, streamContext);
 
     await Report.create({
       userId,
@@ -53,13 +59,20 @@ export async function generateRoadmapHandler(req: Request, res: Response, next: 
     if (!profile) throw new AppError('Profile not found', 404);
 
     const currentSkills = getAllSkills(profile);
-    const gapAnalysis = await analyzeSkillGap(userId, currentSkills, targetRole);
+    const streamContext = {
+      academicStream: profile.academicStream,
+      streamLabel: getStreamLabel(profile.academicStream),
+      branch: profile.education?.branch,
+      targetRole,
+    };
+    const gapAnalysis = await analyzeSkillGap(userId, currentSkills, targetRole, streamContext);
 
     const roadmapData = await generateRoadmap(
       userId,
       targetRole,
       currentSkills,
-      gapAnalysis.missingSkills
+      gapAnalysis.missingSkills,
+      streamContext
     );
 
     const roadmap = await Roadmap.findOneAndUpdate(

@@ -4,6 +4,7 @@ import { Application } from '../models/Application.js';
 import { Interview } from '../models/Interview.js';
 import { CodingResult } from '../models/CodingResult.js';
 import { Resume } from '../models/Resume.js';
+import { getAssessmentScoreLabel } from '../constants/academicStreams.js';
 
 export interface PlacementOverview {
   totalStudents: number;
@@ -127,9 +128,10 @@ export async function getPlacementOverview(college?: string): Promise<PlacementO
     .slice(0, 10)
     .map((p) => {
       const user = userMap.get(p.userId.toString());
+      const assessmentLabel = getAssessmentScoreLabel(p.academicStream).replace(' Score', '');
       const weakAreas: string[] = [];
       if (p.atsScore < 60) weakAreas.push('Resume/ATS');
-      if (p.codingScore < 60) weakAreas.push('Coding');
+      if (p.codingScore < 60) weakAreas.push(assessmentLabel);
       if (p.interviewScore < 60) weakAreas.push('Interview');
       if (p.jobMatchScore < 60) weakAreas.push('Job Match');
       return {

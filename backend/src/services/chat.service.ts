@@ -6,6 +6,7 @@ import { Application } from '../models/Application.js';
 import { geminiService } from '../ai/gemini.service.js';
 import { getAllSkills } from './recommendation.service.js';
 import { AppError } from '../middleware/errorHandler.js';
+import { getStreamLabel, getReadinessFactors } from '../constants/academicStreams.js';
 
 const CAREER_CHAT_SYSTEM = `You are CareerOS AI, an expert career placement copilot for students and freshers in India and globally.
 
@@ -35,6 +36,9 @@ async function buildUserContext(userId: string): Promise<string> {
   const skills = getAllSkills(profile);
   return JSON.stringify({
     name: user?.name ?? 'Student',
+    academicStream: profile.academicStream,
+    stream: getStreamLabel(profile.academicStream),
+    readinessFactors: getReadinessFactors(profile.academicStream),
     education: profile.education,
     targetRole: profile.careerPreferences.targetRole,
     workMode: profile.careerPreferences.workMode,

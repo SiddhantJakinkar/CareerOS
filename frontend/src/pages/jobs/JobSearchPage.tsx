@@ -2,9 +2,12 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { MapPin, Building2, DollarSign, ExternalLink, Globe, Loader2 } from 'lucide-react';
+import { MapPin, Building2, DollarSign, ExternalLink, Globe, Loader2, Bookmark } from 'lucide-react';
 import { jobApi } from '@/services/endpoints';
 import { useAuthStore } from '@/store';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { getErrorMessage } from '@/services/api';
 import { INDIA_CITIES, getDefaultIndiaLocation } from '@/lib/indiaJobs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -83,7 +86,9 @@ function formatJobType(jobType: string): string {
 
 export default function JobSearchPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const profile = useAuthStore((s) => s.profile);
+  const [tab, setTab] = useState<'search' | 'saved' | 'recommended'>('search');
   const defaultLocation = getDefaultIndiaLocation(profile);
   const [searchParams, setSearchParams] = useSearchParams();
   const initialSearch = searchParams.get('search') ?? '';
@@ -135,6 +140,27 @@ export default function JobSearchPage() {
     queryFn: async () => (await jobApi.recommended()).data.data,
   });
 
+  const { data: savedEntries, isLoading: savedLoading } = useQuery({
+    queryKey: ['saved-jobs'],
+    queryFn: async () =>
+      (await jobApi.saved()).data.data as Array<{ _id: string; jobId: Job }>,
+  });
+
+  const savedJobs = (savedEntries ?? [])
+    .map((entry) => entry.jobId)
+    .filter((job): job is Job => Boolean(job && job._id));
+
+  const handleUnsave = async (jobId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await jobApi.unsave(jobId);
+      toast.success('Removed from saved');
+      queryClient.invalidateQueries({ queryKey: ['saved-jobs'] });
+    } catch (err) {
+      toast.error(getErrorMessage(err));
+    }
+  };
+
   const handleSearch = (e?: React.FormEvent) => {
     e?.preventDefault();
     const apiLocation = location === 'India (All)' ? 'India' : location;
@@ -168,7 +194,26 @@ export default function JobSearchPage() {
         <p className="text-text-muted">
           India placements — onsite, hybrid, and remote jobs from LinkedIn, Naukri, Indeed, Internshala, and more
         </p>
-        {jobs.length > 0 && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {(['search', 'saved', 'recommended'] as const).map((t) => (
+            <Button
+              key={t}
+              variant={tab === t ? 'default' : 'secondary'}
+              size="sm"
+              onClick={() => setTab(t)}
+            >
+              {t === 'search' && 'Search'}
+              {t === 'saved' && (
+                <>
+                  <Bookmark className="mr-1 h-4 w-4" />
+                  Saved ({savedEntries?.length ?? 0})
+                </>
+              )}
+              {t === 'recommended' && 'Recommended'}
+            </Button>
+          ))}
+        </div>
+        {tab === 'search' && jobs.length > 0 && (
           <p className="mt-2 flex items-center gap-2 text-sm text-success">
             <Globe className="h-4 w-4" />
             Showing {jobs.length} of {total} matching jobs
@@ -176,6 +221,7 @@ export default function JobSearchPage() {
         )}
       </div>
 
+      {tab === 'search' && (
       <Card>
         <CardContent className="pt-6">
           <form className="flex flex-wrap gap-4" onSubmit={handleSearch}>
@@ -219,8 +265,57 @@ export default function JobSearchPage() {
           </form>
         </CardContent>
       </Card>
+      )}
 
-      {recommended && recommended.length > 0 && (
+      {tab === 'recommended' && (
+        <section>
+          <h2 className="mb-4 text-xl font-semibold">Recommended For You (India)</h2>
+          {recommended && recommended.length > 0 ? (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {recommended.map((job) => (
+                <JobCard key={job._id} job={job} onClick={() => navigate(`/jobs/${job._id}`)} />
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              title="No recommendations yet"
+              description="Complete your profile to get personalized job matches."
+            />
+          )}
+        </section>
+      )}
+
+      {tab === 'saved' && (
+        <section>
+          <h2 className="mb-4 text-xl font-semibold">Saved Jobs</h2>
+          {savedLoading ? (
+            <PageSkeleton />
+          ) : savedJobs.length > 0 ? (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {savedJobs.map((job) => (
+                <div key={job._id} className="relative">
+                  <JobCard job={job} onClick={() => navigate(`/jobs/${job._id}`)} />
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="absolute right-4 top-4"
+                    onClick={(e) => handleUnsave(job._id, e)}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              title="No saved jobs"
+              description="Save jobs from job details to track them here and in your applications board."
+            />
+          )}
+        </section>
+      )}
+
+      {tab === 'search' && recommended && recommended.length > 0 && (
         <section>
           <h2 className="mb-4 text-xl font-semibold">Recommended For You (India)</h2>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -231,6 +326,7 @@ export default function JobSearchPage() {
         </section>
       )}
 
+      {tab === 'search' && (
       <section>
         <h2 className="mb-4 text-xl font-semibold">Jobs in India</h2>
         {jobs.length > 0 ? (
@@ -246,6 +342,7 @@ export default function JobSearchPage() {
           />
         )}
       </section>
+      )}
     </div>
   );
 }

@@ -20,6 +20,7 @@ import {
   type InterviewDomainId,
 } from '../constants/interviewDomains.js';
 import { VIDEO_INTERVIEW_CONFIG } from '../constants/videoInterview.js';
+import { getStreamLabel } from '../constants/academicStreams.js';
 import { uploadVideoToCloudinary } from '../config/cloudinary.js';
 import { transcribeAudio } from '../ai/whisper.service.js';
 import { finalizeInterview } from './interview.controller.helpers.js';
@@ -107,7 +108,22 @@ export async function startInterview(req: Request, res: Response, next: NextFunc
     const userId = req.user!.userId;
     const { domain, type } = req.body as { domain: InterviewDomainId; type: string };
 
-    const questions = await generateInterviewQuestions(userId, DOMAIN_LABELS_MAP[domain] ?? domain, 5);
+    const profile = await Profile.findOne({ userId }).lean();
+    const streamContext = profile
+      ? {
+          academicStream: profile.academicStream,
+          streamLabel: getStreamLabel(profile.academicStream),
+          branch: profile.education?.branch,
+          targetRole: profile.careerPreferences?.targetRole,
+        }
+      : undefined;
+
+    const questions = await generateInterviewQuestions(
+      userId,
+      DOMAIN_LABELS_MAP[domain] ?? domain,
+      5,
+      streamContext
+    );
 
     const interview = await Interview.create({
       userId,

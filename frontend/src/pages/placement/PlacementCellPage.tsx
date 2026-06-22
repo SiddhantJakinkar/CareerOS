@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
@@ -47,6 +48,7 @@ interface RecentPlacement {
 }
 
 export default function PlacementCellPage() {
+  const navigate = useNavigate();
   const [college, setCollege] = useState('');
 
   const { data: colleges } = useQuery({
@@ -176,7 +178,12 @@ export default function PlacementCellPage() {
           <CardHeader><CardTitle>Top Performers</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             {overview?.topPerformers?.map((s: TopPerformer, i: number) => (
-              <div key={s.userId} className="flex items-center justify-between rounded-xl border border-border p-3">
+              <button
+                key={s.userId}
+                type="button"
+                onClick={() => navigate(`/placement-cell/students/${s.userId}`)}
+                className="flex w-full items-center justify-between rounded-xl border border-border p-3 text-left transition-colors hover:bg-surface-hover"
+              >
                 <div className="flex items-center gap-3">
                   <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/20 text-sm font-bold text-primary">
                     {i + 1}
@@ -187,7 +194,7 @@ export default function PlacementCellPage() {
                   </div>
                 </div>
                 <Badge variant="success">{s.readiness}%</Badge>
-              </div>
+              </button>
             )) ?? <p className="text-text-muted">No students yet</p>}
           </CardContent>
         </Card>
@@ -198,7 +205,12 @@ export default function PlacementCellPage() {
           </CardTitle></CardHeader>
           <CardContent className="space-y-3">
             {overview?.atRiskStudents?.map((s: AtRiskStudent) => (
-              <div key={s.userId} className="rounded-xl border border-border p-3">
+              <button
+                key={s.userId}
+                type="button"
+                onClick={() => navigate(`/placement-cell/students/${s.userId}`)}
+                className="w-full rounded-xl border border-border p-3 text-left transition-colors hover:bg-surface-hover"
+              >
                 <div className="flex items-center justify-between">
                   <p className="font-medium">{s.name}</p>
                   <Badge variant="warning">{s.readiness}%</Badge>
@@ -208,7 +220,7 @@ export default function PlacementCellPage() {
                     <Badge key={w} variant="secondary">{w}</Badge>
                   ))}
                 </div>
-              </div>
+              </button>
             )) ?? <p className="text-text-muted">No at-risk students</p>}
           </CardContent>
         </Card>

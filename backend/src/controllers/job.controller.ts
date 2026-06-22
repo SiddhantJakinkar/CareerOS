@@ -10,6 +10,7 @@ import {
   getJobSyncStatusInfo,
 } from '../services/job.service.js';
 import { SavedJob } from '../models/SavedJob.js';
+import { Application } from '../models/Application.js';
 import { Profile } from '../models/Profile.js';
 import { calculateJobMatch } from '../services/recommendation.service.js';
 import { analyzeJobMatch } from '../ai/prompts/index.js';
@@ -177,6 +178,17 @@ export async function saveJob(req: Request, res: Response, next: NextFunction): 
     const saved = await SavedJob.findOneAndUpdate(
       { userId, jobId },
       { userId, jobId },
+      { upsert: true, new: true }
+    );
+
+    await Application.findOneAndUpdate(
+      { userId, jobId },
+      {
+        userId,
+        jobId,
+        status: 'saved',
+        $setOnInsert: { timeline: [{ status: 'saved', date: new Date() }] },
+      },
       { upsert: true, new: true }
     );
 

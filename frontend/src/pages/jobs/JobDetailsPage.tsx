@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { MapPin, ExternalLink, FileText, Mail, Bookmark, Send, Video } from 'lucide-react';
@@ -12,12 +12,24 @@ import { Button } from '@/components/ui/button';
 import { PageSkeleton } from '@/components/ui/skeleton';
 import { ErrorState } from '@/components/ui/empty-state';
 import { JobInsightsPanel } from '@/components/jobs/JobInsightsPanel';
+import { GeneratedArtifactModal } from '@/components/jobs/GeneratedArtifactModal';
 import { CircularProgress } from '@/components/ui/motion';
+
+interface ArtifactState {
+  title: string;
+  subtitle?: string;
+  content: string;
+  downloadFileName?: string;
+  downloadUrl?: string;
+}
 
 export default function JobDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [generating, setGenerating] = useState(false);
+  const queryClient = useQueryClient();
+  const [generatingResume, setGeneratingResume] = useState(false);
+  const [generatingCover, setGeneratingCover] = useState(false);
+  const [artifact, setArtifact] = useState<ArtifactState | null>(null);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['job', id],
@@ -31,36 +43,95 @@ export default function JobDetailsPage() {
     enabled: !!id,
   });
 
+  const { data: savedJobs } = useQuery({
+    queryKey: ['saved-jobs'],
+    queryFn: async () => (await jobApi.saved()).data.data as Array<{ jobId: string | { _id: string } }>,
+  });
+
+  const isSaved = savedJobs?.some((s) => {
+    const jobRef = s.jobId;
+    const savedId = typeof jobRef === 'object' ? jobRef._id : jobRef;
+    return savedId === id;
+  });
+
   const applyMutation = useMutation({
     mutationFn: () => applicationApi.create({ jobId: id!, status: 'applied' }),
-    onSuccess: () => toast.success('Application tracked!'),
+    onSuccess: () => {
+      toast.success('Application tracked!');
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
+    },
     onError: (e) => toast.error(getErrorMessage(e)),
   });
 
   const saveMutation = useMutation({
-    mutationFn: () => jobApi.save(id!),
-    onSuccess: () => toast.success('Job saved!'),
+    mutationFn: () => (isSaved ? jobApi.unsave(id!) : jobApi.save(id!)),
+    onSuccess: () => {
+      toast.success(isSaved ? 'Job removed from saved' : 'Job saved!');
+      queryClient.invalidateQueries({ queryKey: ['saved-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
+    },
     onError: (e) => toast.error(getErrorMessage(e)),
   });
 
-  const handleGenerateResume = async () => {
-    setGenerating(true);
+  const handleApply = async () => {
     try {
-      await resumeApi.generate(id!);
+      await applyMutation.mutateAsync();
+      const applyUrl = data?.job?.applyUrl;
+      if (applyUrl) {
+        window.open(applyUrl, '_blank');
+      }
+    } catch {
+      // error handled by mutation
+    }
+  };
+
+  const handleGenerateResume = async () => {
+    setGeneratingResume(true);
+    try {
+      const res = await resumeApi.generate(id!);
+      const payload = res.data.data as {
+        resume?: { rawText?: string; fileUrl?: string; fileName?: string };
+        generated?: { content?: string };
+      };
+      const job = data?.job;
+      setArtifact({
+        title: 'Tailored Resume',
+        subtitle: job ? `${job.company} · ${job.title}` : undefined,
+        content: payload.generated?.content ?? payload.resume?.rawText ?? '',
+        downloadUrl: payload.resume?.fileUrl,
+        downloadFileName: payload.resume?.fileName,
+      });
       toast.success('Resume generated!');
     } catch (e) {
       toast.error(getErrorMessage(e));
     } finally {
-      setGenerating(false);
+      setGeneratingResume(false);
     }
   };
 
   const handleCoverLetter = async () => {
+    setGeneratingCover(true);
     try {
-      await applicationApi.generateCoverLetter(id!);
-      toast.success('Cover letter generated!');
+      let content = '';
+      const job = data?.job;
+      try {
+        const existing = await applicationApi.getCoverLetter(id!);
+        content = (existing.data.data as { content: string }).content;
+      } catch {
+        const res = await applicationApi.generateCoverLetter(id!);
+        content = (res.data.data as { content: string }).content;
+      }
+      setArtifact({
+        title: 'Cover Letter',
+        subtitle: job ? `${job.company} · ${job.title}` : undefined,
+        content,
+        downloadFileName: job ? `cover-letter-${job.company}.txt` : 'cover-letter.txt',
+      });
+      toast.success('Cover letter ready!');
     } catch (e) {
       toast.error(getErrorMessage(e));
+    } finally {
+      setGeneratingCover(false);
     }
   };
 
@@ -74,6 +145,16 @@ export default function JobDetailsPage() {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+      <GeneratedArtifactModal
+        open={!!artifact}
+        onClose={() => setArtifact(null)}
+        title={artifact?.title ?? ''}
+        subtitle={artifact?.subtitle}
+        content={artifact?.content ?? ''}
+        downloadFileName={artifact?.downloadFileName}
+        downloadUrl={artifact?.downloadUrl}
+      />
+
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">{job.title}</h1>
@@ -93,10 +174,22 @@ export default function JobDetailsPage() {
             <Video className="mr-2 h-4 w-4" />
             Practice Interview
           </Button>
-          <Button variant="secondary" onClick={() => saveMutation.mutate()}><Bookmark className="mr-2 h-4 w-4" />Save</Button>
-          <Button variant="secondary" onClick={handleGenerateResume} loading={generating}><FileText className="mr-2 h-4 w-4" />Resume</Button>
-          <Button variant="secondary" onClick={handleCoverLetter}><Mail className="mr-2 h-4 w-4" />Cover Letter</Button>
-          <Button onClick={() => applyMutation.mutate()}><Send className="mr-2 h-4 w-4" />Apply</Button>
+          <Button variant="secondary" onClick={() => saveMutation.mutate()} loading={saveMutation.isPending}>
+            <Bookmark className={`mr-2 h-4 w-4 ${isSaved ? 'fill-current' : ''}`} />
+            {isSaved ? 'Saved' : 'Save'}
+          </Button>
+          <Button variant="secondary" onClick={handleGenerateResume} loading={generatingResume}>
+            <FileText className="mr-2 h-4 w-4" />
+            Resume
+          </Button>
+          <Button variant="secondary" onClick={handleCoverLetter} loading={generatingCover}>
+            <Mail className="mr-2 h-4 w-4" />
+            Cover Letter
+          </Button>
+          <Button onClick={handleApply} loading={applyMutation.isPending}>
+            <Send className="mr-2 h-4 w-4" />
+            Apply
+          </Button>
         </div>
       </div>
 

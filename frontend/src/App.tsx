@@ -29,6 +29,7 @@ const ProfilePage = lazy(() => import('@/pages/profile/ProfilePage'));
 const NotificationsPage = lazy(() => import('@/pages/notifications/NotificationsPage'));
 const CareerChatPage = lazy(() => import('@/pages/chat/CareerChatPage'));
 const PlacementCellPage = lazy(() => import('@/pages/placement/PlacementCellPage'));
+const PlacementStudentPage = lazy(() => import('@/pages/placement/PlacementStudentPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -92,6 +93,7 @@ export default function App() {
             <Route element={<CounselorRoute />}>
               <Route element={<AppLayout />}>
                 <Route path="/placement-cell" element={<LazyPage><PlacementCellPage /></LazyPage>} />
+                <Route path="/placement-cell/students/:userId" element={<LazyPage><PlacementStudentPage /></LazyPage>} />
               </Route>
             </Route>
           </Route>

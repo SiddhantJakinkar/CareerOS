@@ -1,5 +1,19 @@
 import { geminiService } from '../gemini.service.js';
 
+export interface StreamContext {
+  academicStream?: string;
+  streamLabel?: string;
+  branch?: string;
+  targetRole?: string;
+}
+
+function formatStreamContext(ctx?: StreamContext): string {
+  if (!ctx?.academicStream) return '';
+  return `Academic Stream: ${ctx.streamLabel ?? ctx.academicStream}
+Branch: ${ctx.branch ?? 'N/A'}
+Tailor skill requirements and recommendations to this stream (India placement context). Do not assume software engineering unless the stream is tech/CS.`;
+}
+
 export interface ATSAnalysisResult {
   atsScore: number;
   missingKeywords: string[];
@@ -162,13 +176,17 @@ Answer: ${answer}`
 export async function generateInterviewQuestions(
   userId: string,
   domain: string,
-  count: number = 5
+  count: number = 5,
+  streamContext?: StreamContext
 ): Promise<string[]> {
+  const streamBlock = formatStreamContext(streamContext);
   const result = await geminiService.generateJSON<{ questions: string[] }>(
     userId,
     'interview_evaluation',
-    `Generate ${count} interview questions for ${domain} domain. Return JSON with questions: string[]`,
-    `Domain: ${domain}, Count: ${count}`
+    `Generate ${count} interview questions for ${domain} domain.
+Tailor difficulty and topics to the candidate's academic stream when provided (e.g. aptitude/HR for commerce, clinical for healthcare, technical for CS).
+Return JSON with questions: string[]`,
+    `${streamBlock ? `${streamBlock}\n` : ''}Domain: ${domain}, Count: ${count}`
   );
   return result.questions;
 }
@@ -434,8 +452,8 @@ export interface SkillGapResult {
   recommendations: string[];
 }
 
-const SKILL_GAP_PROMPT = `You are a career skills analyst.
-Compare current skills with target role requirements.
+const SKILL_GAP_PROMPT = `You are a career skills analyst for Indian students across all academic streams (engineering, commerce, arts, science, etc.).
+Compare current skills with target role requirements for the student's stream.
 Return JSON with:
 - currentSkills: string[]
 - requiredSkills: string[]
@@ -446,13 +464,15 @@ Return JSON with:
 export async function analyzeSkillGap(
   userId: string,
   currentSkills: string[],
-  targetRole: string
+  targetRole: string,
+  streamContext?: StreamContext
 ): Promise<SkillGapResult> {
+  const streamBlock = formatStreamContext(streamContext);
   return geminiService.generateJSON<SkillGapResult>(
     userId,
     'skill_gap',
     SKILL_GAP_PROMPT,
-    `Current Skills: ${currentSkills.join(', ')}\nTarget Role: ${targetRole}`
+    `${streamBlock ? `${streamBlock}\n` : ''}Current Skills: ${currentSkills.join(', ')}\nTarget Role: ${targetRole}`
   );
 }
 
@@ -467,8 +487,8 @@ export interface RoadmapResult {
   skillGaps: string[];
 }
 
-const ROADMAP_PROMPT = `You are a learning path designer for tech careers.
-Create a personalized weekly learning roadmap.
+const ROADMAP_PROMPT = `You are a learning path designer for Indian placement preparation across all career streams.
+Create a personalized weekly learning roadmap suited to the student's academic stream (not only coding bootcamps).
 Return JSON with:
 - weeks: array of { week: number, title: string, topics: string[], resources: string[], projects: string[] }
 - skillGaps: string[]`;
@@ -477,13 +497,15 @@ export async function generateRoadmap(
   userId: string,
   targetRole: string,
   currentSkills: string[],
-  missingSkills: string[]
+  missingSkills: string[],
+  streamContext?: StreamContext
 ): Promise<RoadmapResult> {
+  const streamBlock = formatStreamContext(streamContext);
   return geminiService.generateJSON<RoadmapResult>(
     userId,
     'roadmap',
     ROADMAP_PROMPT,
-    `Target Role: ${targetRole}\nCurrent Skills: ${currentSkills.join(', ')}\nMissing Skills: ${missingSkills.join(', ')}`
+    `${streamBlock ? `${streamBlock}\n` : ''}Target Role: ${targetRole}\nCurrent Skills: ${currentSkills.join(', ')}\nMissing Skills: ${missingSkills.join(', ')}`
   );
 }
 
