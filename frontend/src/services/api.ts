@@ -7,7 +7,15 @@ import {
   setCsrfToken,
 } from './tokenMemory';
 
-const API_URL = import.meta.env.VITE_API_URL || '/api';
+function resolveApiUrl(raw: string): string {
+  const trimmed = raw.replace(/\/$/, '');
+  if (!trimmed || trimmed === '/api') return '/api';
+  if (trimmed.endsWith('/api')) return trimmed;
+  if (trimmed.startsWith('http')) return `${trimmed}/api`;
+  return trimmed;
+}
+
+const API_URL = resolveApiUrl(import.meta.env.VITE_API_URL || '/api');
 
 export const api = axios.create({
   baseURL: API_URL,

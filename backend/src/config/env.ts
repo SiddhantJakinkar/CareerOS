@@ -59,3 +59,8 @@ function loadEnv(): Env {
 }
 
 export const env = loadEnv();
+
+/** Comma-separated FRONTEND_URL values (e.g. production + local dev). */
+export function getAllowedOrigins(): string[] {
+  return env.FRONTEND_URL.split(',').map((o) => o.trim()).filter(Boolean);
+}

@@ -7,7 +7,8 @@ export const CSRF_COOKIE = 'csrf_token';
 
 const cookieBase = {
   secure: env.NODE_ENV === 'production',
-  sameSite: 'lax' as const,
+  // Vercel + Render (or any cross-origin HTTPS deploy) needs SameSite=None for cookies.
+  sameSite: (env.NODE_ENV === 'production' ? 'none' : 'lax') as 'none' | 'lax',
 };
 
 export function generateCsrfToken(): string {
