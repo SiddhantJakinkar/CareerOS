@@ -36,7 +36,7 @@ export const PRIMARY_SYNC_CITIES = [
 ] as const;
 
 /** Queries processed per 30-min cron run (rotating batch to respect API limits). */
-export const SYNC_BATCH_SIZE = 12;
+export const SYNC_BATCH_SIZE = 8;
 
 /** Work-mode focused queries rotated into each sync batch. */
 export const WORK_MODE_SYNC_QUERIES = [

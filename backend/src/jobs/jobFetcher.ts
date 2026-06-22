@@ -13,7 +13,7 @@ import {
   SYNC_BATCH_SIZE,
 } from '../constants/jobCategories.js';
 import { inferJobPublisher } from './jobPublisher.js';
-import { searchJSearchJobs } from './jsearchClient.js';
+import { searchJSearchJobs, isJSearchRateLimited } from './jsearchClient.js';
 import { acceptIndiaJob, resolveIndiaLocation } from './indiaJobFilter.js';
 import { inferWorkMode } from './workMode.js';
 
@@ -194,7 +194,7 @@ async function fetchRemoteOkJobs(_options: NetworkFetchOptions): Promise<number>
 }
 
 async function fetchJSearchJobs(options: NetworkFetchOptions): Promise<number> {
-  if (!env.JSEARCH_API_KEY) return 0;
+  if (!env.JSEARCH_API_KEY || isJSearchRateLimited()) return 0;
 
   try {
     const query = buildNetworkSearchQuery(options);
@@ -203,62 +203,54 @@ async function fetchJSearchJobs(options: NetworkFetchOptions): Promise<number> {
     const wantsOnsite = /\bonsite\b|on-site|office jobs|\boffice\b/.test(searchLower);
     const wantsHybrid = /\bhybrid\b/.test(searchLower);
 
-    const passes: Array<{ workFromHome?: boolean }> = [{ }];
-    if (!wantsRemote && !wantsOnsite && !wantsHybrid) {
-      passes.push({ workFromHome: false });
-    }
+    const workFromHome =
+      wantsRemote ? true : wantsOnsite || wantsHybrid ? false : undefined;
 
-    const seenIds = new Set<string>();
+    const jobs = await searchJSearchJobs({
+      query,
+      country: 'in',
+      numPages: 1,
+      datePosted: 'month',
+      workFromHome,
+    });
+
     let count = 0;
 
-    for (const pass of passes) {
-      const jobs = await searchJSearchJobs({
-        query,
-        country: 'in',
-        numPages: 2,
-        datePosted: 'month',
-        workFromHome: pass.workFromHome,
+    for (const job of jobs) {
+      const jobType = normalizeJobType(job.job_employment_type);
+      if (!matchesJobTypeFilter(jobType, options.jobType)) continue;
+
+      const sanitized = sanitizeForAI(job.job_description, 5000);
+      const jobLocation = resolveIndiaLocation(job.job_city, job.job_state, job.job_country);
+      if (!mustBeIndiaJob(jobLocation, sanitized, job.job_country)) continue;
+      if (options.location?.trim() && !matchesLocationFilter(jobLocation, options.location)) continue;
+
+      const workMode = inferWorkMode(sanitized, job.job_is_remote, job.job_title);
+      if (wantsOnsite && workMode === 'remote') continue;
+      if (wantsHybrid && workMode === 'remote') continue;
+      if (wantsRemote && workMode === 'onsite') continue;
+
+      await upsertJob(job.job_id, 'jsearch', {
+        externalId: job.job_id,
+        title: job.job_title,
+        company: job.employer_name,
+        location: jobLocation,
+        salaryMin: job.job_min_salary,
+        salaryMax: job.job_max_salary,
+        jobType,
+        workMode,
+        description: sanitized,
+        requirements: [],
+        responsibilities: [],
+        benefits: [],
+        skills: extractSkillsFromText(sanitized),
+        source: 'jsearch',
+        publisher: inferJobPublisher(job.job_apply_link, job.job_publisher),
+        applyUrl: job.job_apply_link,
+        postedAt: new Date(job.job_posted_at_datetime_utc),
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       });
-
-      for (const job of jobs) {
-        if (seenIds.has(job.job_id)) continue;
-        seenIds.add(job.job_id);
-
-        const jobType = normalizeJobType(job.job_employment_type);
-        if (!matchesJobTypeFilter(jobType, options.jobType)) continue;
-
-        const sanitized = sanitizeForAI(job.job_description, 5000);
-        const jobLocation = resolveIndiaLocation(job.job_city, job.job_state, job.job_country);
-        if (!mustBeIndiaJob(jobLocation, sanitized, job.job_country)) continue;
-        if (options.location?.trim() && !matchesLocationFilter(jobLocation, options.location)) continue;
-
-        const workMode = inferWorkMode(sanitized, job.job_is_remote, job.job_title);
-        if (wantsOnsite && workMode === 'remote') continue;
-        if (wantsHybrid && workMode === 'remote') continue;
-        if (wantsRemote && workMode === 'onsite') continue;
-
-        await upsertJob(job.job_id, 'jsearch', {
-          externalId: job.job_id,
-          title: job.job_title,
-          company: job.employer_name,
-          location: jobLocation,
-          salaryMin: job.job_min_salary,
-          salaryMax: job.job_max_salary,
-          jobType,
-          workMode,
-          description: sanitized,
-          requirements: [],
-          responsibilities: [],
-          benefits: [],
-          skills: extractSkillsFromText(sanitized),
-          source: 'jsearch',
-          publisher: inferJobPublisher(job.job_apply_link, job.job_publisher),
-          applyUrl: job.job_apply_link,
-          postedAt: new Date(job.job_posted_at_datetime_utc),
-          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        });
-        count++;
-      }
+      count++;
     }
 
     return count;
@@ -431,7 +423,7 @@ export async function fetchAllJobs(): Promise<NetworkFetchStats> {
         remoteok: totals.remoteok + result.remoteok,
         adzuna: totals.adzuna + result.adzuna,
       };
-      await delay(env.JSEARCH_API_KEY ? 1200 : 400);
+      await delay(env.JSEARCH_API_KEY ? 3_500 : 400);
     }
 
     const weekAgo = new Date();
