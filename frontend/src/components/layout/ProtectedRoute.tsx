@@ -1,15 +1,8 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuthStore } from '@/store';
-import { getAccessToken } from '@/services/tokenMemory';
 
 export function ProtectedRoute() {
-  const { isAuthenticated, user, logout } = useAuthStore();
-
-  const hasToken = Boolean(getAccessToken());
-  if (isAuthenticated && !hasToken) {
-    logout();
-    return <Navigate to="/login" replace />;
-  }
+  const { isAuthenticated, user } = useAuthStore();
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
